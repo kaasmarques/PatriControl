@@ -1,0 +1,79 @@
+﻿@{
+    var admin = User?.Claims.FirstOrDefault(c => c.Type == "Administrador")?.Value == "True";
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+}
+
+<div class="mb-3">
+    <div class="app-muted text-uppercase" style="letter-spacing:.08em; font-size:.75rem;">
+        Navegação
+    </div>
+</div>
+
+<nav class="nav nav-pills flex-column gap-1">
+    <a asp-controller="Dashboard" asp-action="Index"
+       class="nav-link d-flex align-items-center gap-2 @(currentController == "Dashboard" ? "active" : "")">
+        <i class="bi bi-speedometer2"></i>
+        <span>Dashboard</span>
+    </a>
+
+    <a asp-controller="Patrimonios" asp-action="Index"
+       class="nav-link d-flex align-items-center gap-2 @(currentController == "Patrimonios" ? "active" : "")">
+        <i class="bi bi-box-seam"></i>
+        <span>Patrimônios</span>
+    </a>
+
+    <a asp-controller="Manutencoes" asp-action="Index"
+       class="nav-link d-flex align-items-center gap-2 @(currentController == "Manutencoes" ? "active" : "")">
+        <i class="bi bi-wrench-adjustable"></i>
+        <span>Manutenções</span>
+    </a>
+</nav>
+
+@if (admin)
+{
+    <hr class="my-3" style="border-color: var(--app-border);" />
+
+    <div class="mb-2">
+        <div class="app-muted text-uppercase" style="letter-spacing:.08em; font-size:.75rem;">
+            Administração
+        </div>
+    </div>
+
+    <nav class="nav nav-pills flex-column gap-1">
+        <a asp-controller="Unidades" asp-action="Index"
+           class="nav-link d-flex align-items-center gap-2 @(currentController == "Unidades" ? "active" : "")">
+            <i class="bi bi-building"></i>
+            <span>Unidades</span>
+        </a>
+
+        <a asp-controller="Tipos" asp-action="Index"
+           class="nav-link d-flex align-items-center gap-2 @(currentController == "Tipos" ? "active" : "")">
+            <i class="bi bi-tags"></i>
+            <span>Tipos de Patrimônio</span>
+        </a>
+
+        <a asp-controller="Manutentores" asp-action="Index"
+           class="nav-link d-flex align-items-center gap-2 @(currentController == "Manutentores" ? "active" : "")">
+            <i class="bi bi-person-badge"></i>
+            <span>Manutentores</span>
+        </a>
+
+        <a asp-controller="Fornecedores" asp-action="Index"
+           class="nav-link d-flex align-items-center gap-2 @(currentController == "Fornecedores" ? "active" : "")">
+            <i class="bi bi-truck"></i>
+            <span>Fornecedores</span>
+        </a>
+
+        <a asp-controller="Usuarios" asp-action="Index"
+           class="nav-link d-flex align-items-center gap-2 @(currentController == "Usuarios" ? "active" : "")">
+            <i class="bi bi-people"></i>
+            <span>Usuários</span>
+        </a>
+
+        <a asp-controller="Logs" asp-action="Index"
+           class="nav-link d-flex align-items-center gap-2 @(currentController == "Logs" ? "active" : "")">
+            <i class="bi bi-journal-text"></i>
+            <span>Logs</span>
+        </a>
+    </nav>
+}

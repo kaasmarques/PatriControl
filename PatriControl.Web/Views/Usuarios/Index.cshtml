@@ -1,0 +1,404 @@
+﻿@model IEnumerable<PatriControl.Web.Models.Usuario>
+
+@{
+    ViewData["Title"] = "Usuários";
+
+    string termo = ViewBag.Termo as string ?? "";
+    string status = ViewBag.Status as string ?? "Todos";
+
+    int page = ViewBag.Page is int p ? p : 1;
+    int pageSize = ViewBag.PageSize is int ps ? ps : 10;
+    int total = ViewBag.Total is int t ? t : (Model?.Count() ?? 0);
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+    int exibindo = ViewBag.Exibindo is int ex ? ex : (Model?.Count() ?? 0);
+}
+
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="mb-1 text-white">Usuários</h4>
+        <div class="app-muted">Gestão de usuários do PatriControl.</div>
+    </div>
+
+    <!-- Botão igual ao de Patrimônio -->
+    <button type="button"
+            onclick="abrirNovoUsuario()"
+            class="app-icon-btn"
+            aria-label="Adicionar usuário"
+            title="Adicionar usuário">
+        <i class="bi bi-plus-square-fill" style="font-size:34px;"></i>
+    </button>
+</div>
+
+<div class="app-card p-3">
+
+    <!-- Cabeçalho do bloco (igual padrão) -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="text-white fw-semibold">Filtros</div>
+
+        <div class="app-muted small text-end">
+            Total: <b class="text-white">@total</b>
+            <span class="mx-1">•</span>
+            Página <b class="text-white">@(page)</b>/<b class="text-white">@totalPages</b>
+            <span class="mx-1">•</span>
+            Exibindo <b class="text-white">@exibindo</b>
+        </div>
+    </div>
+
+    <!-- FILTRO SERVER SIDE (termo + status) -->
+    <form method="get" asp-action="Index" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="page" value="1" />
+        <input type="hidden" name="pageSize" value="@pageSize" />
+
+        <div class="col-12 col-md-7">
+            <label class="app-label mb-1">Buscar</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text"
+                       name="termo"
+                       value="@termo"
+                       class="form-control"
+                       placeholder="Buscar por nome, e-mail ou código..." />
+            </div>
+        </div>
+
+        <div class="col-12 col-md-3">
+            <label class="app-label mb-1">Status</label>
+            @{
+                var selTodos = status.Equals("Todos", StringComparison.OrdinalIgnoreCase) ? "selected" : null;
+                var selAtivo = status.Equals("Ativo", StringComparison.OrdinalIgnoreCase) ? "selected" : null;
+                var selInativo = status.Equals("Inativo", StringComparison.OrdinalIgnoreCase) ? "selected" : null;
+            }
+            <select name="status" class="form-select">
+                <option value="Todos" selected="@selTodos">Todos</option>
+                <option value="Ativo" selected="@selAtivo">Ativos</option>
+                <option value="Inativo" selected="@selInativo">Inativos</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-auto">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" style="min-width:110px;">
+                    Filtrar
+                </button>
+
+                <a asp-action="Index"
+                   asp-route-page="1"
+                   asp-route-pageSize="@pageSize"
+                   class="btn btn-outline-secondary"
+                   style="min-width:110px;">
+                    Limpar
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-dark-soft table-hover align-middle mb-0">
+            <thead>
+                <tr class="app-table-head">
+                    <th>USUÁRIO</th>
+                    <th>E-MAIL</th>
+                    <th style="width: 130px;">CÓDIGO</th>
+                    <th style="width: 120px;">STATUS</th>
+                    <th class="text-end" style="width: 260px;">AÇÕES</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="5" class="app-muted">Nenhum usuário cadastrado ainda.</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var u in Model)
+                    {
+                        var isRoot = (u.Codigo == "USR001");
+
+                        <tr>
+                            <td class="text-white">
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="fw-semibold">@u.Nome @u.Sobrenome</span>
+
+                                    @if (u.Administrador)
+                                    {
+                                        <span class="badge app-badge">Admin</span>
+                                    }
+                                </div>
+                            </td>
+
+                            <td class="text-white">@u.Email</td>
+                            <td class="text-white">@u.Codigo</td>
+
+                            <td>
+                                @if ((u.Status ?? "").Equals("Ativo", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <span class="badge-status badge-status-ativo">Ativo</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-status badge-status-baixado">Inativo</span>
+                                }
+                            </td>
+
+                            <td class="text-end">
+                                @if (isRoot)
+                                {
+                                    <span class="app-muted">Usuário raiz</span>
+                                }
+                                else
+                                {
+                                    <div class="d-inline-flex gap-2">
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm"
+                                                data-id="@u.Id"
+                                                data-nome="@($"{u.Nome} {u.Sobrenome}")"
+                                                data-codigo="@u.Codigo"
+                                                onclick="abrirAlterarSenha(this)">
+                                            Alterar senha
+                                        </button>
+
+                                        <button type="button"
+                                                class="btn btn-outline-secondary btn-sm"
+                                                data-id="@u.Id"
+                                                data-nome="@u.Nome"
+                                                data-sobrenome="@u.Sobrenome"
+                                                data-email="@u.Email"
+                                                data-admin="@(u.Administrador ? "true" : "false")"
+                                                data-status="@u.Status"
+                                                data-codigo="@u.Codigo"
+                                                onclick="abrirEditarUsuario(this)">
+                                            Editar
+                                        </button>
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginação (igual padrão, mantendo filtros) -->
+    @if (ViewBag.Paginacao != null && totalPages > 1)
+    {
+        <div class="mt-3">
+            @await Html.PartialAsync("_paginacao", (object)ViewBag.Paginacao)
+        </div>
+    }
+</div>
+
+<!-- =========================
+     MODAIS (Bootstrap)
+     ========================= -->
+<!-- MODAL NOVO USUÁRIO -->
+<div class="modal fade" id="modal-novo-usuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="form-novo-usuario" asp-action="Create" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-header">
+                    <h5 class="modal-title text-white">Novo Usuário</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="app-label app-label-required">Nome</label>
+                        <input class="form-control" name="Nome" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label app-label-required">Sobrenome</label>
+                        <input class="form-control" name="Sobrenome" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label app-label-required">E-mail</label>
+                        <input class="form-control" name="Email" type="email" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label app-label-required">Senha</label>
+                        <input class="form-control" name="Senha" type="password" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label">Status</label>
+                        <select class="form-select" name="Status">
+                            <option>Ativo</option>
+                            <option>Inativo</option>
+                        </select>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="novo-admin" name="Administrador" value="true" />
+                        <label class="form-check-label text-white" for="novo-admin">Administrador</label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL EDITAR USUÁRIO -->
+<div class="modal fade" id="modal-editar-usuario" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="form-editar-usuario" asp-action="Edit" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="edit-id" name="Id" />
+
+                <div class="modal-header">
+                    <h5 class="modal-title text-white">Editar Usuário</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="app-label">Código</label>
+                        <input class="form-control" id="edit-codigo" disabled />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label">Nome</label>
+                        <input class="form-control" id="edit-nome" name="Nome" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label">Sobrenome</label>
+                        <input class="form-control" id="edit-sobrenome" name="Sobrenome" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label">E-mail</label>
+                        <input class="form-control" id="edit-email" name="Email" type="email" required />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label">Status</label>
+                        <select class="form-select" id="edit-status" name="Status">
+                            <option>Ativo</option>
+                            <option>Inativo</option>
+                        </select>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="edit-admin" name="Administrador" value="true" />
+                        <label class="form-check-label text-white" for="edit-admin">Administrador</label>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL ALTERAR SENHA -->
+<div class="modal fade" id="modal-alterar-senha" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="form-alterar-senha" asp-action="AlterarSenha" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="senha-id" name="id" />
+
+                <div class="modal-header">
+                    <h5 class="modal-title text-white">Alterar Senha</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="app-label">Usuário</label>
+                        <input class="form-control" id="senha-usuario" disabled />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="app-label">Nova senha</label>
+                        <input class="form-control" id="senha-nova" name="novaSenha" type="password" required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Helpers Bootstrap Modal (padrão do projeto)
+        function showModal(id) {
+            const el = document.getElementById(id);
+            const m = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true });
+            m.show();
+        }
+        function hideModal(id) {
+            const el = document.getElementById(id);
+            const m = bootstrap.Modal.getOrCreateInstance(el);
+            m.hide();
+        }
+
+        function abrirNovoUsuario() {
+            const form = document.getElementById('form-novo-usuario');
+            if (form) form.reset();
+            showModal('modal-novo-usuario');
+        }
+
+        function abrirEditarUsuario(botao) {
+            const id = botao.getAttribute('data-id');
+            const nome = botao.getAttribute('data-nome') || '';
+            const sobrenome = botao.getAttribute('data-sobrenome') || '';
+            const email = botao.getAttribute('data-email') || '';
+            const admin = botao.getAttribute('data-admin') === 'true';
+            const status = botao.getAttribute('data-status') || 'Ativo';
+            const codigo = botao.getAttribute('data-codigo') || '';
+
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-nome').value = nome;
+            document.getElementById('edit-sobrenome').value = sobrenome;
+            document.getElementById('edit-email').value = email;
+            document.getElementById('edit-status').value = status;
+            document.getElementById('edit-admin').checked = admin;
+            document.getElementById('edit-codigo').value = codigo;
+
+            showModal('modal-editar-usuario');
+        }
+
+        function abrirAlterarSenha(botao) {
+            const id = botao.getAttribute('data-id');
+            const nome = botao.getAttribute('data-nome') || '';
+            const codigo = botao.getAttribute('data-codigo') || '';
+
+            const form = document.getElementById('form-alterar-senha');
+            if (form) form.reset();
+
+            document.getElementById('senha-id').value = id;
+            document.getElementById('senha-usuario').value = `${codigo} - ${nome}`;
+            document.getElementById('senha-nova')?.focus();
+
+            showModal('modal-alterar-senha');
+        }
+
+        // (opcional) se quiser manter as funções antigas de fechar:
+        function fecharNovoUsuario() { hideModal('modal-novo-usuario'); }
+        function fecharEditarUsuario() { hideModal('modal-editar-usuario'); }
+        function fecharAlterarSenha() { hideModal('modal-alterar-senha'); }
+    </script>
+}

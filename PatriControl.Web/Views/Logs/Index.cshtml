@@ -1,0 +1,232 @@
+﻿@model IEnumerable<PatriControl.Web.Models.AuditLog>
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = "Logs";
+
+    int? usuarioId = ViewBag.UsuarioId as int?;
+    string termo = ViewBag.Termo as string ?? "";
+
+    int page = ViewBag.Page is int p ? p : 1;
+    int pageSize = ViewBag.PageSize is int ps ? ps : 20;
+    int total = ViewBag.Total is int t ? t : (Model?.Count() ?? 0);
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+    int exibindo = ViewBag.Exibindo is int ex ? ex : (Model?.Count() ?? 0);
+
+    var usuarios = (ViewBag.Usuarios as IEnumerable<PatriControl.Web.Models.Usuario>) ?? Enumerable.Empty<PatriControl.Web.Models.Usuario>();
+    var usuariosJs = JsonSerializer.Serialize(
+        usuarios.Select(u => new
+        {
+            id = u.Id,
+            codigo = u.Codigo,
+            nome = u.Nome,
+            sobrenome = u.Sobrenome,
+            email = u.Email
+        })
+    );
+
+    var usuarioTextoAtual = "";
+    if (usuarioId.HasValue && usuarioId.Value > 0)
+    {
+        var u = usuarios.FirstOrDefault(x => x.Id == usuarioId.Value);
+        if (u != null) usuarioTextoAtual = $"{u.Codigo} - {u.Nome} {u.Sobrenome}".Trim();
+    }
+}
+
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="mb-1 text-white">Logs</h4>
+        <div class="app-muted">Registro de eventos e ações recentes do sistema.</div>
+    </div>
+</div>
+
+<div class="app-card p-3">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="text-white fw-semibold">Filtros</div>
+
+        <div class="app-muted small text-end">
+            Total: <b class="text-white">@total</b>
+            <span class="mx-1">•</span>
+            Página <b class="text-white">@(page)</b>/<b class="text-white">@totalPages</b>
+            <span class="mx-1">•</span>
+            Exibindo <b class="text-white">@exibindo</b>
+        </div>
+    </div>
+
+    <div class="app-muted small mb-2">Filtre por usuário e/ou palavra-chave (ação, entidade, detalhes).</div>
+
+    <form method="get" asp-action="Index" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="page" value="1" />
+        <input type="hidden" name="pageSize" value="@pageSize" />
+
+        <div class="col-12 col-lg-5">
+            <label class="app-label mb-1">Usuário</label>
+
+            <div class="app-combobox">
+                <input type="hidden" id="usuarioId" name="usuarioId" value="@(usuarioId ?? 0)" />
+
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input type="text"
+                           id="usuario-busca"
+                           class="form-control"
+                           placeholder="Ex: USR002"
+                           value="@usuarioTextoAtual"
+                           autocomplete="off"
+                           oninput="filtrarUsuariosLog()" />
+                </div>
+
+                <div id="usuario-opcoes" class="app-combobox-list" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+            <label class="app-label mb-1">Buscar</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text"
+                       name="termo"
+                       value="@termo"
+                       class="form-control"
+                       placeholder="Ex: criar, manutenção, patrimônio, senha..." />
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-2">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    Filtrar
+                </button>
+
+                <a asp-action="Index"
+                   asp-route-page="1"
+                   asp-route-pageSize="@pageSize"
+                   class="btn btn-outline-secondary w-100">
+                    Limpar
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-dark-soft table-hover align-middle mb-0">
+            <thead>
+                <tr class="app-table-head">
+                    <th style="width:170px;">DATA/HORA</th>
+                    <th style="width:230px;">USUÁRIO</th>
+                    <th style="width:140px;">AÇÃO</th>
+                    <th style="width:180px;">ENTIDADE</th>
+                    <th>DETALHES</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="5" class="app-muted">Nenhum log encontrado.</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var l in Model)
+                    {
+                        var userTxt = l.Usuario == null
+                        ? "Sistema"
+                        : $"{l.Usuario.Codigo} - {l.Usuario.Nome} {l.Usuario.Sobrenome}".Trim();
+
+                        var entidadeTxt = string.IsNullOrWhiteSpace(l.Entidade) ? "-" : l.Entidade;
+                        if (l.EntidadeId.HasValue && l.EntidadeId.Value > 0)
+                            entidadeTxt += $" #{l.EntidadeId.Value}";
+
+                        <tr>
+                            <td class="text-white">@l.DataHora.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td class="text-white">@userTxt</td>
+                            <td class="text-white">@l.Acao</td>
+                            <td class="text-white">@entidadeTxt</td>
+                            <td class="text-white">@((l.Detalhes ?? "-"))</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (ViewBag.Paginacao != null && totalPages > 1)
+    {
+        <div class="mt-3">
+            @await Html.PartialAsync("_paginacao", (object)ViewBag.Paginacao)
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        const usuariosLog = @Html.Raw(usuariosJs);
+
+        function esconderListaUsuariosLog() {
+            const box = document.getElementById('usuario-opcoes');
+            if (box) box.style.display = 'none';
+        }
+
+        document.addEventListener('click', function (e) {
+            const box = document.getElementById('usuario-opcoes');
+            const input = document.getElementById('usuario-busca');
+            if (!box || !input) return;
+            if (!box.contains(e.target) && e.target !== input) box.style.display = 'none';
+        });
+
+        function filtrarUsuariosLog() {
+            const input = document.getElementById('usuario-busca');
+            const box = document.getElementById('usuario-opcoes');
+            const q = (input.value || '').toLowerCase().trim();
+
+            document.getElementById('usuarioId').value = 0;
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = usuariosLog
+                .filter(u =>
+                    (u.codigo || '').toLowerCase().includes(q) ||
+                    (u.nome || '').toLowerCase().includes(q) ||
+                    (u.sobrenome || '').toLowerCase().includes(q) ||
+                    ((u.nome || '') + ' ' + (u.sobrenome || '')).toLowerCase().includes(q) ||
+                    (u.email || '').toLowerCase().includes(q)
+                )
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum usuário encontrado.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(u => `
+                <div class="app-combobox-item" onclick="selecionarUsuarioLog(${u.id})">
+                    <div><b>${escapeHtml(u.codigo || '')}</b> - ${escapeHtml((u.nome || '') + ' ' + (u.sobrenome || ''))}</div>
+                    <small class="app-muted">${escapeHtml(u.email || '')}</small>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarUsuarioLog(id) {
+            const u = usuariosLog.find(x => x.id === id);
+            if (!u) return;
+
+            document.getElementById('usuarioId').value = u.id;
+            document.getElementById('usuario-busca').value = `${u.codigo} - ${(u.nome || '')} ${(u.sobrenome || '')}`.trim();
+            esconderListaUsuariosLog();
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+    </script>
+}

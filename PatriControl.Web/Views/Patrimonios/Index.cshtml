@@ -1,0 +1,1541 @@
+﻿@model IEnumerable<PatriControl.Web.Models.Patrimonio>
+@using System.Text.Json
+@using PatriControl.Web.Models
+
+@{
+    ViewData["Title"] = "Patrimônios";
+
+    var tiposDb = ViewBag.Tipos as List<TipoPatrimonio> ?? new List<TipoPatrimonio>();
+    var fornecedoresDb = ViewBag.Fornecedores as List<Fornecedor> ?? new List<Fornecedor>();
+    var unidadesDb = ViewBag.Unidades as List<Unidade> ?? new List<Unidade>();
+    var localizacoesDb = ViewBag.Localizacoes as List<Localizacao> ?? new List<Localizacao>();
+
+    // ===== Paginação (vem do controller) =====
+    int total = ViewBag.Total ?? 0;
+    int paginaAtual = ViewBag.Page ?? 1;
+    int pageSize = ViewBag.PageSize ?? 20;
+    int totalPages = ViewBag.TotalPages ?? 1;
+
+    // ===== Filtros atuais =====
+    string fNumero = ViewBag.FiltroNumero ?? "";
+    string fDescricao = ViewBag.FiltroDescricao ?? "";
+    string fUnidade = ViewBag.FiltroUnidade ?? "";
+    string fStatus = ViewBag.FiltroStatus ?? "";
+    string fCondicao = ViewBag.FiltroCondicao ?? "";
+
+    // Lista de unidades (PER + Nome)
+    var unidadesJs = JsonSerializer.Serialize(
+        unidadesDb.Select(u => new
+        {
+            id = u.Id,
+            per = u.Per,
+            nome = u.Nome,
+            display = (u.Per + " " + u.Nome).Trim()
+        })
+    );
+
+    // Lista de localizações por unidade (FK UnidadeId)
+    var localizacoesJs = JsonSerializer.Serialize(
+        localizacoesDb.Select(l => new
+        {
+            id = l.Id,
+            unidadeId = l.UnidadeId,
+            nome = l.Nome
+        })
+    );
+
+    var tiposJs = JsonSerializer.Serialize(
+        tiposDb
+            .Select(t => (t.Nome ?? "").Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .OrderBy(x => x)
+            .Select(x => new { nome = x })
+    );
+
+    var fornecedoresJs = JsonSerializer.Serialize(
+        fornecedoresDb
+            .Select(f => (f.Nome ?? "").Trim())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .OrderBy(x => x)
+            .Select(x => new { nome = x })
+    );
+
+    // Listas para selects (Export)
+    var tiposSelect = tiposDb
+        .Select(t => (t.Nome ?? "").Trim())
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    var fornecedoresSelect = fornecedoresDb
+        .Select(f => (f.Nome ?? "").Trim())
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    var unidadesSelect = unidadesDb
+        .Select(u => (u.Per + " " + u.Nome).Trim())
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+}
+
+<!-- Header -->
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="mb-1 text-white">Patrimônios</h4>
+        <div class="app-muted">Listagem dos patrimônios cadastrados.</div>
+    </div>
+
+    <div class="d-flex gap-2 align-items-center">
+        <!-- Exportar Excel -->
+        <button type="button"
+                onclick="abrirExportarExcel()"
+                class="app-icon-btn"
+                aria-label="Exportar para Excel"
+                title="Exportar para Excel">
+            <i class="bi bi-file-earmark-excel-fill" style="font-size:34px;"></i>
+        </button>
+
+        <!-- Criar -->
+        <button type="button"
+                onclick="abrirCriarPatrimonio()"
+                class="app-icon-btn"
+                aria-label="Adicionar patrimônio"
+                title="Adicionar patrimônio">
+            <i class="bi bi-plus-square-fill" style="font-size:34px;"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Filtros -->
+<form method="get" class="app-card p-3 mb-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div class="text-white fw-semibold">Filtros</div>
+
+        <div class="app-muted small">
+            Total: <b class="text-white">@total</b>
+            • Página <b class="text-white">@paginaAtual</b>/<b class="text-white">@totalPages</b>
+            • Exibindo <b class="text-white">@Model.Count()</b>
+        </div>
+    </div>
+
+    <div class="row g-2 g-md-3">
+        <div class="col-12 col-md-3">
+            <label class="form-label app-label">Número</label>
+            <input name="numero" value="@fNumero" class="form-control" placeholder="Ex: 9999" />
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label app-label">Descrição</label>
+            <input name="descricao" value="@fDescricao" class="form-control" placeholder="Ex: Monitor / Notebook..." />
+        </div>
+
+        <!--  Unidade (combobox filtrável) -->
+        <div class="col-12 col-md-5">
+            <label class="form-label app-label">Unidade</label>
+
+            <div class="app-combobox">
+                <input type="hidden" id="filtro-unidade-value" name="unidade" value="@fUnidade" />
+
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-building"></i></span>
+                    <input type="text"
+                           id="filtro-unidade-busca"
+                           class="form-control"
+                           placeholder="Digite para buscar unidade..."
+                           value="@fUnidade"
+                           autocomplete="off"
+                           oninput="filtrarUnidadesFiltro()" />
+                </div>
+
+                <div id="filtro-unidade-opcoes" class="app-combobox-list" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label app-label">Status</label>
+            <select name="status" class="form-select" asp-items="ViewBag.StatusFiltroLista">
+                <option value="">(Todos)</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label app-label">Condição</label>
+            <select name="condicao" class="form-select" asp-items="ViewBag.CondicaoFiltroLista">
+                <option value="">(Todas)</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-4 d-flex align-items-end gap-2">
+            <input type="hidden" name="page" value="1" />
+            <input type="hidden" name="pageSize" value="@pageSize" />
+
+            <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+            <a class="btn btn-outline-secondary w-100" href="@Url.Action("Index", "Patrimonios")">Limpar</a>
+        </div>
+    </div>
+</form>
+
+<!-- Tabela -->
+<div class="app-card p-3">
+    <div class="table-responsive">
+        <table class="table table-dark-soft table-hover align-middle mb-0">
+            <thead>
+                <tr class="app-table-head">
+                    <th style="width:180px;">NÚMERO</th>
+                    <th>DESCRIÇÃO</th>
+                    <th style="width:260px;">UNIDADE</th>
+                    <th style="width:190px;">STATUS</th>
+                    <th style="width:160px;">CONDIÇÃO</th>
+                    <th style="width:210px;" class="text-end">AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody id="patrimonios-tbody">
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="6" class="app-muted">Nenhum patrimônio encontrado.</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var p in Model)
+                    {
+                        var payload = JsonSerializer.Serialize(new
+                        {
+                            id = p.Id,
+                            numero = p.Numero,
+                            descricao = p.Descricao,
+                            unidade = p.Unidade,
+                            localizacao = p.Localizacao,
+                            tipo = p.Tipo,
+                            fornecedor = p.Fornecedor,
+                            numeroSerieNF = p.NumeroSerieNF,
+                            numeroNF = p.NumeroNF,
+                            valor = p.Valor,
+                            dataCompra = p.DataCompra?.ToString("yyyy-MM-dd") ?? "",
+                            status = p.Status,
+                            condicao = p.Condicao
+                        });
+
+                        var bloqueado = string.Equals(p.Status?.Trim(), "Em manutenção", StringComparison.OrdinalIgnoreCase);
+
+                        var statusKey = (p.Status ?? "").Trim().ToLowerInvariant();
+                        var statusClass = statusKey switch
+                        {
+                            "ativo" => "app-badge-status app-badge-status-ativo",
+                            "baixado" => "app-badge-status app-badge-status-baixado",
+                            "emprestado" => "app-badge-status app-badge-status-emprestado",
+                            "aguardando manutenção" => "app-badge-status app-badge-status-aguardando",
+                            "em manutenção" => "app-badge-status app-badge-status-manutencao",
+                            _ => "badge-soft"
+                        };
+
+                        <tr>
+                            <td class="fw-semibold text-white">@(string.IsNullOrWhiteSpace(p.Numero) ? "-" : p.Numero)</td>
+                            <td class="text-white">@p.Descricao</td>
+                            <td class="app-muted">@p.Unidade</td>
+                            <td>
+                                <span class="badge rounded-pill px-3 py-2 @statusClass">@p.Status</span>
+                            </td>
+                            <td class="app-muted">@p.Condicao</td>
+                            <td class="text-end">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        data-patrimonio='@Html.Raw(payload)'
+                                        onclick="abrirDetalhesPatrimonio(this)">
+                                    Ver
+                                </button>
+
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary ms-1"
+                                        data-patrimonio='@Html.Raw(payload)'
+                                        @(bloqueado ? "disabled title=\"Patrimônio em manutenção: edição bloqueada\"" : "")
+                                        onclick="@(bloqueado ? "return false;" : "abrirEditarPatrimonio(this)")">
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginação padronizada (partial) -->
+    @{
+        var rv = new Dictionary<string, object?>
+        {
+            ["numero"] = fNumero,
+            ["descricao"] = fDescricao,
+            ["unidade"] = fUnidade,
+            ["status"] = fStatus,
+            ["condicao"] = fCondicao
+        };
+
+        var pag = new PaginacaoViewModel
+        {
+            Page = paginaAtual,
+            PageSize = pageSize,
+            TotalPages = totalPages,
+            Action = "Index",
+            Controller = "Patrimonios",
+            RouteValues = rv
+        };
+    }
+
+    @await Html.PartialAsync("_Paginacao", pag)
+</div>
+
+<!-- =================================================
+   MODAL: EXPORTAR EXCEL
+   ================================================= -->
+<div class="modal fade" id="modal-exportar-excel" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Exportar patrimônios para Excel</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="ExportExcel" asp-controller="Patrimonios" method="post" id="form-export-excel">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-body">
+                    <div class="app-muted mb-3">
+                        Selecione os filtros abaixo ou deixe <b class="text-white">(Todos/as)</b> para exportar tudo.
+                        <div class="small mt-1">Obs.: <b class="text-white">Localização</b> depende da <b class="text-white">Unidade</b>.</div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Unidade</label>
+                            <select class="form-select" id="exp-unidade" name="unidade">
+                                <option value="">(Todas)</option>
+                                @foreach (var u in unidadesSelect)
+                                {
+                                    <option value="@u">@u</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Localização</label>
+                            <select class="form-select" id="exp-localizacao" name="localizacao" disabled>
+                                <option value="">(Todas)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Tipo</label>
+                            <select class="form-select" id="exp-tipo" name="tipo">
+                                <option value="">(Todos)</option>
+                                @foreach (var t in tiposSelect)
+                                {
+                                    <option value="@t">@t</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Fornecedor</label>
+                            <select class="form-select" id="exp-fornecedor" name="fornecedor">
+                                <option value="">(Todos)</option>
+                                @foreach (var f in fornecedoresSelect)
+                                {
+                                    <option value="@f">@f</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Status</label>
+                            <select class="form-select" id="exp-status" name="status" asp-items="ViewBag.StatusFiltroLista">
+                                <option value="">(Todos)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Condição</label>
+                            <select class="form-select" id="exp-condicao" name="condicao" asp-items="ViewBag.CondicaoFiltroLista">
+                                <option value="">(Todas)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="app-muted small mt-3">
+                        O Excel será gerado com as colunas:
+                        <b class="text-white">
+                            N° Patrimonio, Descrição, Unidade, Localização, Tipo, Fornecedor, N° Série NF, N° NF, Valor, Data de compra, Status, Condição.
+                        </b>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-download me-1"></i> Exportar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: DETALHES (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-detalhes-patrimonio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Detalhes do Patrimônio</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Número do Patrimônio</label>
+                        <input class="form-control" id="det-numero" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Descrição</label>
+                        <input class="form-control" id="det-descricao" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Unidade</label>
+                        <input class="form-control" id="det-unidade" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Localização</label>
+                        <input class="form-control" id="det-localizacao" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Tipo</label>
+                        <input class="form-control" id="det-tipo" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Fornecedor</label>
+                        <input class="form-control" id="det-fornecedor" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label class="form-label app-label">Nº Série NF</label>
+                        <input class="form-control" id="det-numero-serie-nf" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label class="form-label app-label">Nº NF</label>
+                        <input class="form-control" id="det-numero-nf" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label class="form-label app-label">Valor</label>
+                        <input class="form-control" id="det-valor" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-3">
+                        <label class="form-label app-label">Data de Compra</label>
+                        <input class="form-control" id="det-datacompra" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Status</label>
+                        <input class="form-control" id="det-status" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Condição</label>
+                        <input class="form-control" id="det-condicao" readonly tabindex="-1" />
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="text-white fw-semibold mb-1">Trâmites do Patrimônio</div>
+                    <div id="det-tramites" class="app-tramites-scroll">
+                        <div class="app-muted">Carregando histórico...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: EDITAR (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-editar-patrimonio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Editar Patrimônio</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="Edit" method="post" id="form-edit-patrimonio">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="edit-id" name="Id" />
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Número do patrimônio</label>
+                            <input class="form-control" id="edit-numero" name="Numero" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Descrição</label>
+                            <input class="form-control" id="edit-descricao" name="Descricao" required />
+                        </div>
+
+                        <!--  Unidade (combobox) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Unidade</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="edit-unidade-id" value="" />
+                                <input type="hidden" id="edit-unidade-value" name="Unidade" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-building"></i></span>
+                                    <input type="text"
+                                           id="edit-unidade-busca"
+                                           class="form-control"
+                                           placeholder="Digite para buscar unidade..."
+                                           autocomplete="off"
+                                           oninput="filtrarUnidadesEdit()" />
+                                </div>
+
+                                <div id="edit-unidade-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <!--  Localização (combobox - depende da unidade) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Localização</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="edit-localizacao-value" name="Localizacao" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                                    <input type="text"
+                                           id="edit-localizacao-busca"
+                                           class="form-control"
+                                           placeholder="Selecione a unidade primeiro..."
+                                           autocomplete="off"
+                                           oninput="filtrarLocalizacoesEdit()" />
+                                </div>
+
+                                <div id="edit-localizacao-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <!--  Tipo (combobox) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Tipo</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="edit-tipo-value" name="Tipo" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-tag"></i></span>
+                                    <input type="text"
+                                           id="edit-tipo-busca"
+                                           class="form-control"
+                                           placeholder="Digite para buscar tipo..."
+                                           autocomplete="off"
+                                           oninput="filtrarTiposEdit()" />
+                                </div>
+
+                                <div id="edit-tipo-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <!--  Fornecedor (combobox) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Fornecedor</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="edit-fornecedor-value" name="Fornecedor" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-truck"></i></span>
+                                    <input type="text"
+                                           id="edit-fornecedor-busca"
+                                           class="form-control"
+                                           placeholder="Digite para buscar fornecedor..."
+                                           autocomplete="off"
+                                           oninput="filtrarFornecedoresEdit()" />
+                                </div>
+
+                                <div id="edit-fornecedor-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Nº Série NF</label>
+                            <input class="form-control" id="edit-numero-serie-nf" name="NumeroSerieNF" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Nº NF</label>
+                            <input class="form-control" id="edit-numero-nf" name="NumeroNF" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Valor</label>
+                            <input class="form-control" id="edit-valor" name="ValorTexto" inputmode="decimal" autocomplete="off" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Data de Compra</label>
+                            <input class="form-control" id="edit-datacompra" name="DataCompra" type="date" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Status</label>
+                            <select class="form-select" id="edit-status" name="Status" asp-items="ViewBag.StatusLista"></select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Condição</label>
+                            <select class="form-select" id="edit-condicao" name="Condicao" asp-items="ViewBag.CondicaoLista"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: CRIAR (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-criar-patrimonio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Cadastrar Patrimônio</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="Create" method="post" id="form-create-patrimonio">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Número do patrimônio</label>
+                            <input class="form-control" name="Numero" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Descrição</label>
+                            <input class="form-control" name="Descricao" required />
+                        </div>
+
+                        <!--  Unidade (combobox) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Unidade</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="create-unidade-id" value="" />
+                                <input type="hidden" id="create-unidade-value" name="Unidade" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-building"></i></span>
+                                    <input type="text"
+                                           id="create-unidade-busca"
+                                           class="form-control"
+                                           placeholder="Digite para buscar unidade..."
+                                           autocomplete="off"
+                                           oninput="filtrarUnidadesCreate()" />
+                                </div>
+
+                                <div id="create-unidade-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <!--  Localização (combobox - depende da unidade) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Localização</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="create-localizacao-value" name="Localizacao" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                                    <input type="text"
+                                           id="create-localizacao-busca"
+                                           class="form-control"
+                                           placeholder="Selecione a unidade primeiro..."
+                                           autocomplete="off"
+                                           oninput="filtrarLocalizacoesCreate()" />
+                                </div>
+
+                                <div id="create-localizacao-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <!--  Tipo (combobox) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label app-label-required">Tipo</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="create-tipo-value" name="Tipo" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-tag"></i></span>
+                                    <input type="text"
+                                           id="create-tipo-busca"
+                                           class="form-control"
+                                           placeholder="Digite para buscar tipo..."
+                                           autocomplete="off"
+                                           required
+                                           oninput="filtrarTiposCreate()" />
+                                </div>
+
+                                <div id="create-tipo-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <!--  Fornecedor (combobox) -->
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Fornecedor</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="create-fornecedor-value" name="Fornecedor" value="" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-truck"></i></span>
+                                    <input type="text"
+                                           id="create-fornecedor-busca"
+                                           class="form-control"
+                                           placeholder="Digite para buscar fornecedor..."
+                                           autocomplete="off"
+                                           oninput="filtrarFornecedoresCreate()" />
+                                </div>
+
+                                <div id="create-fornecedor-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Nº Série NF</label>
+                            <input class="form-control" name="NumeroSerieNF" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Nº NF</label>
+                            <input class="form-control" name="NumeroNF" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Valor</label>
+                            <input class="form-control" name="ValorTexto" inputmode="decimal" autocomplete="off" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Data de Compra</label>
+                            <input class="form-control" name="DataCompra" type="date" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Status</label>
+                            <select class="form-select" name="Status" asp-items="ViewBag.StatusLista"></select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Condição</label>
+                            <select class="form-select" name="Condicao" asp-items="ViewBag.CondicaoLista"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const unidades = @Html.Raw(unidadesJs);
+        const localizacoes = @Html.Raw(localizacoesJs);
+        const tipos = @Html.Raw(tiposJs);
+        const fornecedores = @Html.Raw(fornecedoresJs);
+
+        // =========================================================
+        // Helpers gerais
+        // =========================================================
+        function enc(s) { return encodeURIComponent(s || ""); }
+        function dec(s) { return decodeURIComponent(s || ""); }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function showModal(id) {
+            const el = document.getElementById(id);
+            const m = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true });
+            m.show();
+        }
+
+        function hideBox(boxId) {
+            const box = document.getElementById(boxId);
+            if (box) box.style.display = 'none';
+        }
+
+        // Fecha dropdowns ao clicar fora
+        document.addEventListener('click', function (e) {
+            const combos = [
+                { input: 'filtro-unidade-busca', box: 'filtro-unidade-opcoes' },
+
+                { input: 'create-unidade-busca', box: 'create-unidade-opcoes' },
+                { input: 'create-localizacao-busca', box: 'create-localizacao-opcoes' },
+                { input: 'create-tipo-busca', box: 'create-tipo-opcoes' },
+                { input: 'create-fornecedor-busca', box: 'create-fornecedor-opcoes' },
+
+                { input: 'edit-unidade-busca', box: 'edit-unidade-opcoes' },
+                { input: 'edit-localizacao-busca', box: 'edit-localizacao-opcoes' },
+                { input: 'edit-tipo-busca', box: 'edit-tipo-opcoes' },
+                { input: 'edit-fornecedor-busca', box: 'edit-fornecedor-opcoes' },
+            ];
+
+            combos.forEach(c => {
+                const input = document.getElementById(c.input);
+                const box = document.getElementById(c.box);
+                if (!input || !box) return;
+
+                if (!box.contains(e.target) && e.target !== input) {
+                    box.style.display = 'none';
+                }
+            });
+        });
+
+        function getUnidadeByDisplay(display) {
+            if (!display) return null;
+            const d = (display || "").trim();
+            return unidades.find(u => (u.display || "").trim() === d) || null;
+        }
+
+        function getUnidadeById(id) {
+            const n = parseInt(id);
+            if (!n) return null;
+            return unidades.find(u => u.id === n) || null;
+        }
+
+        // =========================================================
+        // EXPORT EXCEL (modal)
+        // =========================================================
+        function abrirExportarExcel() {
+            // reset padrão
+            const u = document.getElementById('exp-unidade');
+            const l = document.getElementById('exp-localizacao');
+            if (u) u.value = "";
+            if (l) {
+                l.innerHTML = `<option value="">(Todas)</option>`;
+                l.disabled = true;
+            }
+            showModal('modal-exportar-excel');
+        }
+
+        function updateLocalizacoesExport() {
+            const unidadeDisplay = (document.getElementById('exp-unidade')?.value || "").trim();
+            const locSelect = document.getElementById('exp-localizacao');
+            if (!locSelect) return;
+
+            // limpa e bloqueia por padrão
+            locSelect.innerHTML = `<option value="">(Todas)</option>`;
+            locSelect.disabled = true;
+
+            const uObj = getUnidadeByDisplay(unidadeDisplay);
+            const unidadeId = uObj ? uObj.id : 0;
+
+            if (!unidadeId) return;
+
+            const locs = localizacoes
+                .filter(x => x.unidadeId === unidadeId)
+                .map(x => (x.nome || "").trim())
+                .filter(x => !!x)
+                .sort((a, b) => a.localeCompare(b));
+
+            locs.forEach(n => {
+                locSelect.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`);
+            });
+
+            locSelect.disabled = false;
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const selUnidade = document.getElementById('exp-unidade');
+            if (selUnidade) {
+                selUnidade.addEventListener('change', function () {
+                    // ao trocar unidade, recria localizações
+                    updateLocalizacoesExport();
+                });
+            }
+        });
+
+        // =========================================================
+        // Combobox: Unidade (Filtro)
+        // =========================================================
+        function filtrarUnidadesFiltro() {
+            const input = document.getElementById('filtro-unidade-busca');
+            const box = document.getElementById('filtro-unidade-opcoes');
+            const hidden = document.getElementById('filtro-unidade-value');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hidden.value = ""; // desseleciona até clicar numa opção
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = unidades
+                .filter(u =>
+                    (u.display || '').toLowerCase().includes(q) ||
+                    (u.per || '').toLowerCase().includes(q) ||
+                    (u.nome || '').toLowerCase().includes(q)
+                )
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhuma unidade encontrada.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(u => `
+                <div class="app-combobox-item" onclick="selecionarUnidadeFiltro(${u.id})">
+                    <div><b>${escapeHtml(u.per || '')}</b> - ${escapeHtml(u.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarUnidadeFiltro(id) {
+            const u = getUnidadeById(id);
+            if (!u) return;
+
+            document.getElementById('filtro-unidade-value').value = (u.display || '').trim();
+            document.getElementById('filtro-unidade-busca').value = (u.display || '').trim();
+            hideBox('filtro-unidade-opcoes');
+        }
+
+        // =========================================================
+        // Combobox: Unidade (Create)
+        // =========================================================
+        function filtrarUnidadesCreate() {
+            const input = document.getElementById('create-unidade-busca');
+            const box = document.getElementById('create-unidade-opcoes');
+            const hiddenValue = document.getElementById('create-unidade-value');
+            const hiddenId = document.getElementById('create-unidade-id');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hiddenValue.value = "";
+            hiddenId.value = "";
+
+            // ao digitar unidade, limpa localização
+            document.getElementById('create-localizacao-value').value = "";
+            document.getElementById('create-localizacao-busca').value = "";
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = unidades
+                .filter(u =>
+                    (u.display || '').toLowerCase().includes(q) ||
+                    (u.per || '').toLowerCase().includes(q) ||
+                    (u.nome || '').toLowerCase().includes(q)
+                )
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhuma unidade encontrada.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(u => `
+                <div class="app-combobox-item" onclick="selecionarUnidadeCreate(${u.id})">
+                    <div><b>${escapeHtml(u.per || '')}</b> - ${escapeHtml(u.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarUnidadeCreate(id) {
+            const u = getUnidadeById(id);
+            if (!u) return;
+
+            document.getElementById('create-unidade-id').value = String(u.id);
+            document.getElementById('create-unidade-value').value = (u.display || '').trim();
+            document.getElementById('create-unidade-busca').value = (u.display || '').trim();
+
+            // limpa localização ao trocar unidade
+            document.getElementById('create-localizacao-value').value = "";
+            document.getElementById('create-localizacao-busca').value = "";
+
+            hideBox('create-unidade-opcoes');
+        }
+
+        // =========================================================
+        // Combobox: Localização (Create) - depende unidadeId
+        // =========================================================
+        function filtrarLocalizacoesCreate() {
+            const unidadeId = parseInt(document.getElementById('create-unidade-id').value || "0");
+            const input = document.getElementById('create-localizacao-busca');
+            const box = document.getElementById('create-localizacao-opcoes');
+            const hidden = document.getElementById('create-localizacao-value');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hidden.value = "";
+
+            if (!unidadeId) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Selecione uma unidade primeiro.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const locs = localizacoes
+                .filter(l => l.unidadeId === unidadeId && (l.nome || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!locs.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhuma localização encontrada.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = locs.map(l => `
+                <div class="app-combobox-item" onclick="selecionarLocalizacaoCreate('${enc(l.nome)}')">
+                    <div>${escapeHtml(l.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarLocalizacaoCreate(nomeEnc) {
+            const nome = dec(nomeEnc);
+            document.getElementById('create-localizacao-value').value = nome;
+            document.getElementById('create-localizacao-busca').value = nome;
+            hideBox('create-localizacao-opcoes');
+        }
+
+        // =========================================================
+        // Combobox: Tipo (Create)
+        // =========================================================
+        function filtrarTiposCreate() {
+            const input = document.getElementById('create-tipo-busca');
+            const box = document.getElementById('create-tipo-opcoes');
+            const hidden = document.getElementById('create-tipo-value');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hidden.value = "";
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = tipos
+                .filter(t => (t.nome || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum tipo encontrado.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(t => `
+                <div class="app-combobox-item" onclick="selecionarTipoCreate('${enc(t.nome)}')">
+                    <div>${escapeHtml(t.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarTipoCreate(nomeEnc) {
+            const nome = dec(nomeEnc);
+            document.getElementById('create-tipo-value').value = nome;
+            document.getElementById('create-tipo-busca').value = nome;
+            hideBox('create-tipo-opcoes');
+        }
+
+        // =========================================================
+        // Combobox: Fornecedor (Create)
+        // =========================================================
+        function filtrarFornecedoresCreate() {
+            const input = document.getElementById('create-fornecedor-busca');
+            const box = document.getElementById('create-fornecedor-opcoes');
+            const hidden = document.getElementById('create-fornecedor-value');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hidden.value = "";
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = fornecedores
+                .filter(f => (f.nome || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum fornecedor encontrado.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(f => `
+                <div class="app-combobox-item" onclick="selecionarFornecedorCreate('${enc(f.nome)}')">
+                    <div>${escapeHtml(f.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarFornecedorCreate(nomeEnc) {
+            const nome = dec(nomeEnc);
+            document.getElementById('create-fornecedor-value').value = nome;
+            document.getElementById('create-fornecedor-busca').value = nome;
+            hideBox('create-fornecedor-opcoes');
+        }
+
+        // =========================================================
+        // Edit: Unidade / Localização / Tipo / Fornecedor
+        // =========================================================
+        function filtrarUnidadesEdit() {
+            const input = document.getElementById('edit-unidade-busca');
+            const box = document.getElementById('edit-unidade-opcoes');
+            const hiddenValue = document.getElementById('edit-unidade-value');
+            const hiddenId = document.getElementById('edit-unidade-id');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hiddenValue.value = "";
+            hiddenId.value = "";
+
+            // ao digitar unidade, limpa localização
+            document.getElementById('edit-localizacao-value').value = "";
+            document.getElementById('edit-localizacao-busca').value = "";
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = unidades
+                .filter(u =>
+                    (u.display || '').toLowerCase().includes(q) ||
+                    (u.per || '').toLowerCase().includes(q) ||
+                    (u.nome || '').toLowerCase().includes(q)
+                )
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhuma unidade encontrada.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(u => `
+                <div class="app-combobox-item" onclick="selecionarUnidadeEdit(${u.id})">
+                    <div><b>${escapeHtml(u.per || '')}</b> - ${escapeHtml(u.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarUnidadeEdit(id) {
+            const u = getUnidadeById(id);
+            if (!u) return;
+
+            document.getElementById('edit-unidade-id').value = String(u.id);
+            document.getElementById('edit-unidade-value').value = (u.display || '').trim();
+            document.getElementById('edit-unidade-busca').value = (u.display || '').trim();
+
+            // limpa localização ao trocar unidade
+            document.getElementById('edit-localizacao-value').value = "";
+            document.getElementById('edit-localizacao-busca').value = "";
+
+            hideBox('edit-unidade-opcoes');
+        }
+
+        function filtrarLocalizacoesEdit() {
+            const unidadeId = parseInt(document.getElementById('edit-unidade-id').value || "0");
+            const input = document.getElementById('edit-localizacao-busca');
+            const box = document.getElementById('edit-localizacao-opcoes');
+            const hidden = document.getElementById('edit-localizacao-value');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hidden.value = "";
+
+            if (!unidadeId) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Selecione uma unidade primeiro.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const locs = localizacoes
+                .filter(l => l.unidadeId === unidadeId && (l.nome || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!locs.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhuma localização encontrada.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = locs.map(l => `
+                <div class="app-combobox-item" onclick="selecionarLocalizacaoEdit('${enc(l.nome)}')">
+                    <div>${escapeHtml(l.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarLocalizacaoEdit(nomeEnc) {
+            const nome = dec(nomeEnc);
+            document.getElementById('edit-localizacao-value').value = nome;
+            document.getElementById('edit-localizacao-busca').value = nome;
+            hideBox('edit-localizacao-opcoes');
+        }
+
+        function filtrarTiposEdit() {
+            const input = document.getElementById('edit-tipo-busca');
+            const box = document.getElementById('edit-tipo-opcoes');
+            const hidden = document.getElementById('edit-tipo-value');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hidden.value = "";
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = tipos
+                .filter(t => (t.nome || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum tipo encontrado.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(t => `
+                <div class="app-combobox-item" onclick="selecionarTipoEdit('${enc(t.nome)}')">
+                    <div>${escapeHtml(t.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarTipoEdit(nomeEnc) {
+            const nome = dec(nomeEnc);
+            document.getElementById('edit-tipo-value').value = nome;
+            document.getElementById('edit-tipo-busca').value = nome;
+            hideBox('edit-tipo-opcoes');
+        }
+
+        function filtrarFornecedoresEdit() {
+            const input = document.getElementById('edit-fornecedor-busca');
+            const box = document.getElementById('edit-fornecedor-opcoes');
+            const hidden = document.getElementById('edit-fornecedor-value');
+            const q = (input.value || '').toLowerCase().trim();
+
+            hidden.value = "";
+
+            if (!q) { box.style.display = 'none'; return; }
+
+            const filtrados = fornecedores
+                .filter(f => (f.nome || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum fornecedor encontrado.</div>`;
+                box.style.display = 'block';
+                return;
+            }
+
+            box.innerHTML = filtrados.map(f => `
+                <div class="app-combobox-item" onclick="selecionarFornecedorEdit('${enc(f.nome)}')">
+                    <div>${escapeHtml(f.nome || '')}</div>
+                </div>
+            `).join('');
+
+            box.style.display = 'block';
+        }
+
+        function selecionarFornecedorEdit(nomeEnc) {
+            const nome = dec(nomeEnc);
+            document.getElementById('edit-fornecedor-value').value = nome;
+            document.getElementById('edit-fornecedor-busca').value = nome;
+            hideBox('edit-fornecedor-opcoes');
+        }
+
+        // =========================================================
+        // Validação: Tipo (Create/Edit) precisa ser válido
+        // =========================================================
+        function trySyncExactFromInput(inputId, hiddenId, list, propName) {
+            const input = document.getElementById(inputId);
+            const hidden = document.getElementById(hiddenId);
+            if (!input || !hidden) return;
+
+            const txt = (input.value || "").trim();
+            if (!txt) { hidden.value = ""; return; }
+
+            const found = list.find(x => (x[propName] || "").trim().toLowerCase() === txt.toLowerCase());
+            if (found) hidden.value = (found[propName] || "").trim();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const formCreate = document.getElementById('form-create-patrimonio');
+            if (formCreate) {
+                formCreate.addEventListener('submit', function (e) {
+                    trySyncExactFromInput('create-tipo-busca', 'create-tipo-value', tipos, 'nome');
+                    trySyncExactFromInput('create-fornecedor-busca', 'create-fornecedor-value', fornecedores, 'nome');
+
+                    const tipoHidden = (document.getElementById('create-tipo-value')?.value || "").trim();
+                    const tipoInput = (document.getElementById('create-tipo-busca')?.value || "").trim();
+
+                    if (!tipoHidden && tipoInput) {
+                        e.preventDefault();
+                        alert("Selecione um Tipo válido na lista.");
+                    }
+                });
+            }
+
+            const formEdit = document.getElementById('form-edit-patrimonio');
+            if (formEdit) {
+                formEdit.addEventListener('submit', function (e) {
+                    trySyncExactFromInput('edit-tipo-busca', 'edit-tipo-value', tipos, 'nome');
+                    trySyncExactFromInput('edit-fornecedor-busca', 'edit-fornecedor-value', fornecedores, 'nome');
+
+                    const tipoHidden = (document.getElementById('edit-tipo-value')?.value || "").trim();
+                    const tipoInput = (document.getElementById('edit-tipo-busca')?.value || "").trim();
+
+                    if (tipoInput && !tipoHidden) {
+                        e.preventDefault();
+                        alert("Selecione um Tipo válido na lista.");
+                    }
+                });
+            }
+        });
+
+        // =========================================================
+        // Tramites / Detalhes (mantido)
+        // =========================================================
+        function formatarDataHoraBr(iso) {
+            if (!iso) return "";
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return "";
+            return d.toLocaleString("pt-BR");
+        }
+
+        function carregarTramites(patrimonioId) {
+            const container = document.getElementById('det-tramites');
+            if (!container) return;
+
+            container.innerHTML = '<div class="app-muted">Carregando histórico...</div>';
+
+            fetch(`/Patrimonios/Tramites?id=${patrimonioId}`)
+                .then(r => r.ok ? r.json() : [])
+                .then(lista => {
+                    if (!lista || !lista.length) {
+                        container.innerHTML = '<div class="app-muted">Nenhum trâmite registrado.</div>';
+                        return;
+                    }
+
+                    let html = "";
+                    lista.forEach(t => {
+                        const tipo = t.tipo || "";
+                        const nome = t.nomeUsuario || "";
+                        const data = formatarDataHoraBr(t.dataHora);
+
+                        let codigo = "";
+                        if (t.usuarioId && t.usuarioId > 0) {
+                            codigo = "USR" + String(t.usuarioId).padStart(3, "0");
+                        }
+
+                        const usuarioLabel = codigo ? `${codigo} | ${nome}` : nome;
+
+                        if (tipo === "CRIACAO") {
+                            html += `
+                                <div class="app-tramite-item">
+                                    <div class="app-tramite-header">
+                                        <span>${usuarioLabel} criou o patrimônio</span>
+                                        <span class="app-muted">${data}</span>
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            const campo  = t.campo || "";
+                            const antigo = t.valorAntigo || "";
+                            const novo   = t.valorNovo || "";
+
+                            html += `
+                                <div class="app-tramite-item">
+                                    <div class="app-tramite-header">
+                                        <span>${usuarioLabel} alterou</span>
+                                        <span class="app-muted">${data}</span>
+                                    </div>
+                                    <div class="app-tramite-campo">
+                                        ${escapeHtml(campo)}: <b>${escapeHtml(antigo)}</b> → <b>${escapeHtml(novo)}</b>
+                                    </div>
+                                </div>
+                            `;
+                        }
+                    });
+
+                    container.innerHTML = html;
+                })
+                .catch(() => {
+                    container.innerHTML = '<div class="text-danger">Erro ao carregar trâmites.</div>';
+                });
+        }
+
+        function abrirDetalhesPatrimonio(botao) {
+            const json = botao.getAttribute('data-patrimonio') || '{}';
+            let p = {};
+            try { p = JSON.parse(json); } catch { }
+
+            document.getElementById('det-numero').value          = p.numero || '';
+            document.getElementById('det-descricao').value       = p.descricao || '';
+            document.getElementById('det-unidade').value         = p.unidade || '';
+            document.getElementById('det-localizacao').value     = p.localizacao || '';
+            document.getElementById('det-tipo').value            = p.tipo || '';
+            document.getElementById('det-fornecedor').value      = p.fornecedor || '';
+            document.getElementById('det-numero-serie-nf').value = p.numeroSerieNF || '';
+            document.getElementById('det-numero-nf').value       = p.numeroNF || '';
+
+            if (p.valor != null && p.valor !== "") {
+                const numeroValor = Number(p.valor);
+                if (!isNaN(numeroValor)) {
+                    document.getElementById('det-valor').value =
+                        numeroValor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+                } else {
+                    document.getElementById('det-valor').value = p.valor;
+                }
+            } else {
+                document.getElementById('det-valor').value = '';
+            }
+
+            document.getElementById('det-datacompra').value = p.dataCompra || '';
+            document.getElementById('det-status').value     = p.status || '';
+            document.getElementById('det-condicao').value   = p.condicao || '';
+
+            if (p.id) carregarTramites(p.id);
+            else {
+                const container = document.getElementById('det-tramites');
+                if (container) container.innerHTML = '<div class="app-muted">Nenhum trâmite encontrado.</div>';
+            }
+
+            showModal('modal-detalhes-patrimonio');
+        }
+
+        function abrirEditarPatrimonio(botao) {
+            const json = botao.getAttribute('data-patrimonio') || '{}';
+            let p = {};
+            try { p = JSON.parse(json); } catch { }
+
+            document.getElementById('edit-id').value = p.id || 0;
+            document.getElementById('edit-numero').value = p.numero || '';
+            document.getElementById('edit-descricao').value = p.descricao || '';
+            document.getElementById('edit-numero-serie-nf').value = p.numeroSerieNF || '';
+            document.getElementById('edit-numero-nf').value = p.numeroNF || '';
+
+            if (p.valor != null && p.valor !== "") {
+                const numeroValor = Number(p.valor);
+                if (!isNaN(numeroValor)) {
+                    document.getElementById('edit-valor').value =
+                        numeroValor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                } else {
+                    document.getElementById('edit-valor').value = p.valor;
+                }
+            } else {
+                document.getElementById('edit-valor').value = '';
+            }
+
+            document.getElementById('edit-datacompra').value = p.dataCompra || '';
+            document.getElementById('edit-status').value = p.status || 'Ativo';
+            document.getElementById('edit-condicao').value = p.condicao || 'Novo';
+
+            // Unidade / Localização
+            const unidadeDisplay = (p.unidade || '').trim();
+            const unidadeObj = getUnidadeByDisplay(unidadeDisplay);
+            const unidadeId = unidadeObj ? unidadeObj.id : 0;
+
+            document.getElementById('edit-unidade-busca').value = unidadeDisplay;
+            document.getElementById('edit-unidade-value').value = unidadeDisplay;
+            document.getElementById('edit-unidade-id').value = unidadeId ? String(unidadeId) : "";
+
+            const loc = (p.localizacao || '').trim();
+            document.getElementById('edit-localizacao-busca').value = loc;
+            document.getElementById('edit-localizacao-value').value = loc;
+
+            // Tipo / Fornecedor
+            const tipo = (p.tipo || '').trim();
+            document.getElementById('edit-tipo-busca').value = tipo;
+            document.getElementById('edit-tipo-value').value = tipo;
+
+            const forn = (p.fornecedor || '').trim();
+            document.getElementById('edit-fornecedor-busca').value = forn;
+            document.getElementById('edit-fornecedor-value').value = forn;
+
+            showModal('modal-editar-patrimonio');
+        }
+
+        function abrirCriarPatrimonio() {
+            const form = document.querySelector('#modal-criar-patrimonio form');
+            if (form) form.reset();
+
+            // limpa comboboxes (create)
+            document.getElementById('create-unidade-id').value = "";
+            document.getElementById('create-unidade-value').value = "";
+            document.getElementById('create-unidade-busca').value = "";
+
+            document.getElementById('create-localizacao-value').value = "";
+            document.getElementById('create-localizacao-busca').value = "";
+
+            document.getElementById('create-tipo-value').value = "";
+            document.getElementById('create-tipo-busca').value = "";
+
+            document.getElementById('create-fornecedor-value').value = "";
+            document.getElementById('create-fornecedor-busca').value = "";
+
+            showModal('modal-criar-patrimonio');
+        }
+    </script>
+}

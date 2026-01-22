@@ -1,0 +1,203 @@
+/* ===============================
+   Theme básico (Bootstrap vibes)
+   =============================== */
+:root {
+    --pc-radius: 14px;
+    --pc-shadow: 0 10px 30px rgba(15, 23, 42, .10);
+    /* puxa do bootstrap */
+    --pc-primary: var(--bs-primary);
+    --pc-danger: var(--bs-danger);
+    --pc-muted-bg: var(--bs-tertiary-bg);
+    --pc-border: var(--bs-border-color);
+    --pc-text: var(--bs-body-color);
+}
+
+body {
+    background: var(--bs-body-bg);
+    color: var(--pc-text);
+}
+
+/* ===============================
+   Cards
+   =============================== */
+.pc-card,
+.pc-table-card {
+    background: var(--bs-body-bg);
+    border: 1px solid var(--pc-border);
+    border-radius: var(--pc-radius);
+    box-shadow: var(--pc-shadow);
+}
+
+/* ===============================
+   Page Header
+   =============================== */
+.pc-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.pc-page-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.pc-page-subtitle {
+    color: var(--bs-secondary-color);
+    margin-top: .15rem;
+}
+
+/* ===============================
+   Botões (mapeia pc-btn -> Bootstrap)
+   =============================== */
+.pc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    padding: .5rem .9rem;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    font-weight: 600;
+    line-height: 1.1;
+    user-select: none;
+    text-decoration: none;
+    transition: transform .05s ease, background-color .15s ease, border-color .15s ease, opacity .15s ease;
+}
+
+    .pc-btn:active {
+        transform: translateY(1px);
+    }
+
+.pc-btn-primary {
+    background: var(--pc-primary);
+    color: #fff;
+}
+
+    .pc-btn-primary:hover {
+        filter: brightness(.95);
+    }
+
+.pc-btn-ghost {
+    background: transparent;
+    border-color: var(--pc-border);
+    color: var(--bs-body-color);
+}
+
+    .pc-btn-ghost:hover {
+        background: var(--bs-tertiary-bg);
+    }
+
+.pc-btn-danger {
+    background: var(--pc-danger);
+    color: #fff;
+    border-color: var(--pc-danger);
+}
+
+    .pc-btn-danger:hover {
+        filter: brightness(.95);
+    }
+
+.pc-btn-circle {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    font-size: 1.25rem;
+}
+
+/* desabilitado */
+.pc-btn-disabled,
+.pc-btn[disabled],
+.pc-btn:disabled {
+    opacity: .55;
+    pointer-events: none;
+}
+
+/* ===============================
+   Form Controls
+   (deixa o Bootstrap mandar, só ajusta estética)
+   =============================== */
+.form-control,
+.form-select {
+    border-radius: 12px;
+}
+
+    .form-control:focus,
+    .form-select:focus {
+        box-shadow: 0 0 0 .2rem rgba(13,110,253,.15); /* igual vibe bs */
+    }
+
+    /* readonly visual */
+    .pc-readonly,
+    .form-control[readonly] {
+        background: var(--pc-muted-bg);
+        cursor: default;
+        caret-color: transparent;
+    }
+
+/* ===============================
+   Tables
+   =============================== */
+.pc-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+    .pc-table thead th {
+        color: var(--bs-secondary-color);
+        font-weight: 700;
+        font-size: .85rem;
+        border-bottom: 1px solid var(--pc-border);
+        padding: .85rem .75rem;
+    }
+
+    .pc-table tbody td {
+        padding: .85rem .75rem;
+        border-bottom: 1px solid var(--bs-border-color-translucent);
+    }
+
+    .pc-table tbody tr:hover {
+        background: var(--bs-tertiary-bg);
+    }
+
+/* ===============================
+   Modal (mantém seu modal atual, mas com visual bootstrap)
+   =============================== */
+.pc-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1055; /* igual bootstrap modal */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.pc-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+}
+
+.pc-modal-content {
+    position: relative;
+    width: min(820px, 100%);
+    background: var(--bs-body-bg);
+    border: 1px solid var(--pc-border);
+    border-radius: 18px;
+    box-shadow: var(--pc-shadow);
+    padding: 1rem 1.25rem;
+}
+
+.pc-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .75rem;
+}

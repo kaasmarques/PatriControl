@@ -1,0 +1,43 @@
+# =========================
+# ASP.NET / Visual Studio
+# =========================
+.vs/
+**/bin/
+**/obj/
+*.user
+*.suo
+*.cache
+*.log
+
+# Rider
+.idea/
+
+# =========================
+# SQLite (não subir DB)
+# =========================
+*.db
+*.db-shm
+*.db-wal
+
+# =========================
+# DataProtection keys (não subir)
+# =========================
+**/keys/
+
+# =========================
+# Secrets / configs locais
+# =========================
+**/appsettings.Development.json
+**/appsettings.*.local.json
+
+# =========================
+# Publicação
+# =========================
+publish/
+**/wwwroot/lib/
+
+# =========================
+# OS
+# =========================
+.DS_Store
+Thumbs.db

@@ -1,0 +1,29 @@
+﻿@model ErrorViewModel
+@{
+    ViewData["Title"] = "Erro";
+}
+
+<div class="pc-page-header">
+    <div>
+        <div class="pc-page-title">Ocorreu um erro</div>
+        <div class="pc-page-subtitle">Não foi possível processar sua solicitação.</div>
+    </div>
+</div>
+
+<div class="pc-card" style="padding: 1.5rem;">
+    <p>Se o problema persistir, entre em contato com o suporte do sistema.</p>
+
+    @if (Model.ShowRequestId)
+    {
+        <p>
+            <strong>ID da requisição:</strong>
+            <code>@Model.RequestId</code>
+        </p>
+    }
+
+    <hr />
+
+    <p style="color:#6b7280; font-size:0.9rem;">
+        Em ambiente de desenvolvimento, mais detalhes sobre o erro serão exibidos no console.
+    </p>
+</div>

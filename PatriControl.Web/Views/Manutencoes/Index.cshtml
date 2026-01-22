@@ -1,0 +1,1374 @@
+﻿@model IEnumerable<PatriControl.Web.Models.Manutencao>
+@using PatriControl.Web.Models
+@using System.Text.Json
+@using System.Security.Claims
+
+@{
+    ViewData["Title"] = "Manutenções";
+
+    var patrimonios = ViewBag.Patrimonios as List<Patrimonio> ?? new List<Patrimonio>();
+    var manutentores = ViewBag.Manutentores as List<Manutentor> ?? new List<Manutentor>();
+
+    // Model já vem paginado pelo Controller
+    var emAndamento = Model.Where(m => m.Status != "Finalizada" && m.Status != "Cancelada").ToList();
+    var finalizadas = Model.Where(m => m.Status == "Finalizada").ToList();
+    var canceladas = Model.Where(m => m.Status == "Cancelada").ToList();
+
+    // Totais reais (do filtro completo), para não depender do Model paginado
+    var emAndamentoTotal = ViewBag.EmAndamentoTotal is int eat ? eat : emAndamento.Count;
+    var finalizadasTotal = ViewBag.FinalizadasTotal is int ft ? ft : finalizadas.Count;
+    var canceladasTotal = ViewBag.CanceladasTotal is int ct ? ct : canceladas.Count;
+
+    // Preview de código (apenas visual; o controller gera o definitivo)
+    var lastId = ViewBag.LastManutencaoId != null ? Convert.ToInt64(ViewBag.LastManutencaoId) : 0L;
+    var codigoPreview = $"#MAN{(lastId + 1):0000}";
+
+    var nomeUsuario = User?.Identity?.Name ?? "Usuário";
+    var codigoUsuario = User?.Claims?.FirstOrDefault(c => c.Type == "Codigo")?.Value ?? "";
+
+    var admin = User?.Claims?.FirstOrDefault(c => c.Type == "Administrador")?.Value == "True";
+
+    // Dataset para JS
+    var patrimoniosJs = JsonSerializer.Serialize(
+        patrimonios.Select(p => new
+        {
+            id = p.Id,
+            numero = p.Numero,
+            descricao = p.Descricao,
+            status = p.Status,
+            tipo = p.Tipo
+        })
+    );
+
+    var manutentoresJs = JsonSerializer.Serialize(
+        manutentores.Select(m => new
+        {
+            id = m.Id,
+            nome = m.Nome
+        })
+    );
+
+    string BadgeStatusClass(string? status)
+    {
+        var s = (status ?? "").Trim().ToLowerInvariant();
+        return s switch
+        {
+            "finalizada" => "app-badge-state app-badge-state-ok",
+            "cancelada" => "app-badge-state app-badge-state-off",
+            _ => "app-badge-state app-badge-state-warn"
+        };
+    }
+}
+
+<!-- Header -->
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="mb-1 text-white">Manutenções</h4>
+        <div class="app-muted">Abertura e histórico de manutenções.</div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="button"
+                onclick="abrirCriarManutencao()"
+                class="app-icon-btn"
+                aria-label="Abrir manutenção"
+                title="Abrir manutenção">
+            <i class="bi bi-plus-square-fill" style="font-size:34px;"></i>
+        </button>
+    </div>
+</div>
+
+@{
+    var patrimoniosFiltro = ViewBag.Patrimonios as List<Patrimonio> ?? new List<Patrimonio>();
+    var usuariosFiltro = ViewBag.Usuarios as List<Usuario> ?? new List<Usuario>();
+
+    var patrimonioTexto = ViewBag.PatrimonioTexto as string ?? "";
+    var usuarioTexto = ViewBag.UsuarioTexto as string ?? "";
+    var patrimonioIdSel = ViewBag.PatrimonioId as int?;
+    var usuarioIdSel = ViewBag.UsuarioId as int?;
+
+    var patrimoniosFiltroJs = JsonSerializer.Serialize(
+        patrimoniosFiltro.Select(p => new { id = p.Id, numero = p.Numero, descricao = p.Descricao })
+    );
+
+    var usuariosFiltroJs = JsonSerializer.Serialize(
+        usuariosFiltro.Select(u => new { id = u.Id, codigo = u.Codigo, nome = u.Nome, sobrenome = u.Sobrenome, email = u.Email })
+    );
+}
+
+<div class="app-card p-3 mb-3">
+    <div class="mb-2">
+        <div class="text-white fw-semibold">Filtros</div>
+        <div class="app-muted small">Busque e selecione um patrimônio e/ou um usuário.</div>
+    </div>
+
+    <form method="get" asp-action="Index" class="row g-2 align-items-end">
+        <input type="hidden" name="patrimonioId" id="filtro-patrimonio-id" value="@(patrimonioIdSel ?? 0)" />
+        <input type="hidden" name="usuarioId" id="filtro-usuario-id" value="@(usuarioIdSel ?? 0)" />
+
+        <div class="col-12 col-lg-5">
+            <label class="app-label mb-1">Patrimônio</label>
+            <div class="app-combobox">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text"
+                           class="form-control"
+                           name="patrimonio"
+                           id="filtro-patrimonio-texto"
+                           placeholder="Ex: 4569 ou Notebook Dell..."
+                           value="@patrimonioTexto"
+                           autocomplete="off"
+                           oninput="filtrarPatrimoniosFiltro()" />
+                </div>
+
+                <div id="filtro-patrimonio-opcoes" class="app-combobox-list" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+            <label class="app-label mb-1">Usuário (quem abriu)</label>
+            <div class="app-combobox">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                    <input type="text"
+                           class="form-control"
+                           name="usuario"
+                           id="filtro-usuario-texto"
+                           placeholder="Ex: USR002"
+                           value="@usuarioTexto"
+                           autocomplete="off"
+                           oninput="filtrarUsuariosFiltro()" />
+                </div>
+
+                <div id="filtro-usuario-opcoes" class="app-combobox-list" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-auto">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" style="min-width:110px;">Filtrar</button>
+                <a asp-action="Index" class="btn btn-outline-secondary" style="min-width:110px;">Limpar</a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Board -->
+<div class="row g-3">
+    <!-- Em andamento -->
+    <div class="col-12 col-lg-4">
+        <div class="app-card p-3 h-100 app-board-col">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="text-white fw-semibold">Em andamento</div>
+                <span class="badge badge-soft rounded-pill px-3 py-2">@emAndamentoTotal</span>
+            </div>
+
+            @if (!emAndamento.Any())
+            {
+                <div class="app-muted app-board-empty">Nenhuma manutenção em andamento nesta página.</div>
+            }
+            else
+            {
+                foreach (var m in emAndamento)
+                {
+                    var payload = JsonSerializer.Serialize(new
+                    {
+                        id = m.Id,
+                        codigo = m.Codigo,
+                        status = m.Status,
+                        abertaEm = m.AbertaEm,
+                        finalizadaEm = m.FinalizadaEm,
+                        custoEstimado = m.CustoEstimado,
+                        custoFinal = m.CustoFinal,
+                        statusFinalPatrimonio = m.StatusFinalPatrimonio,
+                        observacoesFinais = m.ObservacoesFinais,
+
+                        abertaPorId = m.AbertaPorId,
+                        abertaPorCodigo = m.AbertaPor != null ? m.AbertaPor.Codigo : null,
+                        abertaPorNome = m.AbertaPor != null ? m.AbertaPor.Nome : null,
+                        abertaPorSobrenome = m.AbertaPor != null ? m.AbertaPor.Sobrenome : null,
+
+                        patrimonioId = m.PatrimonioId,
+                        patrimonioNumero = m.Patrimonio?.Numero,
+                        patrimonioDescricao = m.Patrimonio?.Descricao,
+                        tipoPatrimonio = m.Patrimonio?.Tipo,
+
+                        manutentorId = m.ManutentorId,
+                        manutentorNome = m.Manutentor?.Nome,
+
+                        tipoManutencaoId = m.TipoManutencaoId,
+                        tipoManutencaoNome = m.TipoManutencao?.Nome
+                    });
+
+                    <div class="app-board-item">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                            <div class="text-white fw-bold">@m.Codigo</div>
+                            <span class="badge rounded-pill px-3 py-2 @BadgeStatusClass(m.Status)">@m.Status</span>
+                        </div>
+
+                        <div class="text-white">
+                            <b>@(m.Patrimonio?.Numero ?? "")</b> - @(m.Patrimonio?.Descricao ?? "")
+                        </div>
+                        <div class="app-muted small mt-1">Tipo: @(m.Patrimonio?.Tipo ?? "-")</div>
+                        <div class="app-muted small">Manutenção: @(m.TipoManutencao?.Nome ?? "-")</div>
+                        <div class="app-muted small">Manutentor: @(m.Manutentor?.Nome ?? "-")</div>
+                        <div class="app-muted small">Aberta em: @m.AbertaEm.ToString("dd/MM/yyyy HH:mm")</div>
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    data-manutencao='@Html.Raw(payload)'
+                                    onclick="abrirVerManutencao(this)">
+                                Ver
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- Finalizadas -->
+    <div class="col-12 col-lg-4">
+        <div class="app-card p-3 h-100 app-board-col">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="text-white fw-semibold">Finalizadas</div>
+                <span class="badge badge-soft rounded-pill px-3 py-2">@finalizadasTotal</span>
+            </div>
+
+            @if (!finalizadas.Any())
+            {
+                <div class="app-muted app-board-empty">Nenhuma manutenção finalizada nesta página.</div>
+            }
+            else
+            {
+                foreach (var m in finalizadas)
+                {
+                    var payload = JsonSerializer.Serialize(new
+                    {
+                        id = m.Id,
+                        codigo = m.Codigo,
+                        status = m.Status,
+                        abertaEm = m.AbertaEm,
+                        finalizadaEm = m.FinalizadaEm,
+                        custoEstimado = m.CustoEstimado,
+                        custoFinal = m.CustoFinal,
+                        statusFinalPatrimonio = m.StatusFinalPatrimonio,
+                        observacoesFinais = m.ObservacoesFinais,
+
+                        abertaPorId = m.AbertaPorId,
+                        abertaPorCodigo = m.AbertaPor != null ? m.AbertaPor.Codigo : null,
+                        abertaPorNome = m.AbertaPor != null ? m.AbertaPor.Nome : null,
+                        abertaPorSobrenome = m.AbertaPor != null ? m.AbertaPor.Sobrenome : null,
+
+                        patrimonioId = m.PatrimonioId,
+                        patrimonioNumero = m.Patrimonio?.Numero,
+                        patrimonioDescricao = m.Patrimonio?.Descricao,
+                        tipoPatrimonio = m.Patrimonio?.Tipo,
+
+                        manutentorId = m.ManutentorId,
+                        manutentorNome = m.Manutentor?.Nome,
+
+                        tipoManutencaoId = m.TipoManutencaoId,
+                        tipoManutencaoNome = m.TipoManutencao?.Nome
+                    });
+
+                    <div class="app-board-item">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                            <div class="text-white fw-bold">@m.Codigo</div>
+                            <span class="badge rounded-pill px-3 py-2 @BadgeStatusClass("Finalizada")">Finalizada</span>
+                        </div>
+
+                        <div class="text-white">
+                            <b>@(m.Patrimonio?.Numero ?? "")</b> - @(m.Patrimonio?.Descricao ?? "")
+                        </div>
+                        <div class="app-muted small mt-1">Tipo: @(m.Patrimonio?.Tipo ?? "-")</div>
+                        <div class="app-muted small">Manutenção: @(m.TipoManutencao?.Nome ?? "-")</div>
+                        <div class="app-muted small">Manutentor: @(m.Manutentor?.Nome ?? "-")</div>
+                        <div class="app-muted small">Aberta em: @m.AbertaEm.ToString("dd/MM/yyyy HH:mm")</div>
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    data-manutencao='@Html.Raw(payload)'
+                                    onclick="abrirVerManutencao(this)">
+                                Ver
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+
+    <!-- Canceladas -->
+    <div class="col-12 col-lg-4">
+        <div class="app-card p-3 h-100 app-board-col">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="text-white fw-semibold">Canceladas</div>
+                <span class="badge badge-soft rounded-pill px-3 py-2">@canceladasTotal</span>
+            </div>
+
+            @if (!canceladas.Any())
+            {
+                <div class="app-muted app-board-empty">Nenhuma manutenção cancelada nesta página.</div>
+            }
+            else
+            {
+                foreach (var m in canceladas)
+                {
+                    var payload = JsonSerializer.Serialize(new
+                    {
+                        id = m.Id,
+                        codigo = m.Codigo,
+                        status = m.Status,
+                        abertaEm = m.AbertaEm,
+                        finalizadaEm = m.FinalizadaEm,
+                        custoEstimado = m.CustoEstimado,
+                        custoFinal = m.CustoFinal,
+                        statusFinalPatrimonio = m.StatusFinalPatrimonio,
+                        observacoesFinais = m.ObservacoesFinais,
+
+                        abertaPorId = m.AbertaPorId,
+                        abertaPorCodigo = m.AbertaPor != null ? m.AbertaPor.Codigo : null,
+                        abertaPorNome = m.AbertaPor != null ? m.AbertaPor.Nome : null,
+                        abertaPorSobrenome = m.AbertaPor != null ? m.AbertaPor.Sobrenome : null,
+
+                        patrimonioId = m.PatrimonioId,
+                        patrimonioNumero = m.Patrimonio?.Numero,
+                        patrimonioDescricao = m.Patrimonio?.Descricao,
+                        tipoPatrimonio = m.Patrimonio?.Tipo,
+
+                        manutentorId = m.ManutentorId,
+                        manutentorNome = m.Manutentor?.Nome,
+
+                        tipoManutencaoId = m.TipoManutencaoId,
+                        tipoManutencaoNome = m.TipoManutencao?.Nome
+                    });
+
+                    <div class="app-board-item">
+                        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                            <div class="text-white fw-bold">@m.Codigo</div>
+                            <span class="badge rounded-pill px-3 py-2 @BadgeStatusClass("Cancelada")">Cancelada</span>
+                        </div>
+
+                        <div class="text-white">
+                            <b>@(m.Patrimonio?.Numero ?? "")</b> - @(m.Patrimonio?.Descricao ?? "")
+                        </div>
+                        <div class="app-muted small mt-1">Tipo: @(m.Patrimonio?.Tipo ?? "-")</div>
+                        <div class="app-muted small">Manutenção: @(m.TipoManutencao?.Nome ?? "-")</div>
+                        <div class="app-muted small">Manutentor: @(m.Manutentor?.Nome ?? "-")</div>
+                        <div class="app-muted small">Aberta em: @m.AbertaEm.ToString("dd/MM/yyyy HH:mm")</div>
+
+                        <div class="d-flex justify-content-end mt-3">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-secondary"
+                                    data-manutencao='@Html.Raw(payload)'
+                                    onclick="abrirVerManutencao(this)">
+                                Ver
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Paginação (padrão do sistema) -->
+@if (ViewBag.Paginacao != null && (int)ViewBag.Paginacao.TotalPages > 1)
+{
+    <div class="mt-3">
+        @await Html.PartialAsync("_paginacao", (object)ViewBag.Paginacao)
+    </div>
+}
+
+<!-- =================================================
+   MODAL: CRIAR MANUTENÇÃO (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-criar-manutencao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Abrir Manutenção</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="Create" method="post" id="form-criar-manutencao">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Código da manutenção</label>
+                            <input class="form-control" value="@codigoPreview" disabled />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Status</label>
+                            <input class="form-control" value="Em andamento" disabled />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Aberta em</label>
+                            <input class="form-control" id="create-abertaem" disabled />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Aberta por</label>
+                            <input class="form-control" value="@($"{nomeUsuario}{(string.IsNullOrWhiteSpace(codigoUsuario) ? "" : $" • {codigoUsuario}")}")" disabled />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label app-label app-label-required">Patrimônio (pesquise e selecione)</label>
+
+                            <div class="app-combobox">
+                                <input type="hidden" id="patrimonioId" name="patrimonioId" />
+
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-box-seam"></i>
+                                    </span>
+
+                                    <input type="text"
+                                           id="patrimonio-busca"
+                                           class="form-control"
+                                           placeholder="Digite número ou descrição..."
+                                           autocomplete="off"
+                                           oninput="filtrarPatrimonios()" />
+                                </div>
+
+                                <div id="patrimonio-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+
+                            <div class="app-muted small mt-2" id="patrimonio-hint" style="display:none;"></div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Tipo de Patrimônio</label>
+
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="bi bi-tags"></i>
+                                </span>
+
+                                <input class="form-control" id="tipo-patrimonio" disabled />
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Tipo de Manutenção <span class="text-danger">*</span></label>
+                            <div class="d-flex gap-2 align-items-center">
+                                <select class="form-select" id="tipoManutencaoId" name="tipoManutencaoId" required>
+                                    <option value="">Selecione um patrimônio acima...</option>
+                                </select>
+
+                                @if (admin)
+                                {
+                                    <button type="button"
+                                            id="btn-gerenciar-tipos"
+                                            class="btn btn-outline-secondary btn-sm"
+                                            title="Gerenciar tipos de manutenção"
+                                            style="display:none;"
+                                            onclick="abrirModalTiposManutencao()">
+                                        <i class="bi bi-list"></i>
+                                    </button>
+                                }
+                            </div>
+                            <div class="app-muted small mt-2" id="tiposmanut-hint" style="display:none;"></div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Manutentor</label>
+
+                            <div class="app-combobox">
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-person-badge"></i>
+                                    </span>
+
+                                    <input type="text"
+                                           id="manutentor-busca"
+                                           class="form-control"
+                                           placeholder="Digite para buscar..."
+                                           autocomplete="off"
+                                           oninput="filtrarManutentores()" />
+                                </div>
+
+                                <input type="hidden" id="manutentorId" name="manutentorId" />
+                                <div id="manutentor-opcoes" class="app-combobox-list" style="display:none;"></div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Custo estimado</label>
+                            <input class="form-control" name="custoEstimado" type="number" step="0.01" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit">Salvar</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: VER MANUTENÇÃO (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-ver-manutencao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Detalhes da Manutenção</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Código</label>
+                        <input class="form-control" id="m-codigo" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Status</label>
+                        <input class="form-control" id="m-status" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Patrimônio</label>
+                        <input class="form-control" id="m-patrimonio" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Tipo de Patrimônio</label>
+                        <input class="form-control" id="m-tipopatrimonio" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Tipo de Manutenção</label>
+                        <input class="form-control" id="m-tipomanut" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Manutentor</label>
+                        <input class="form-control" id="m-manutentor" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Aberta em</label>
+                        <input class="form-control" id="m-abertaem" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Aberta por</label>
+                        <input class="form-control" id="m-abertapor" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Custo estimado</label>
+                        <input class="form-control" id="m-custoestimado" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Finalizada em</label>
+                        <input class="form-control" id="m-finalizadaem" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Custo final</label>
+                        <input class="form-control" id="m-custofinal" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label app-label">Status Final Patrimônio</label>
+                        <input class="form-control" id="m-statusfinal" readonly tabindex="-1" />
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label app-label">Observações finais</label>
+                        <textarea class="form-control" id="m-observacoesfinais" rows="3" readonly tabindex="-1"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="btn-abrir-finalizar" type="button" class="btn app-btn-ok" onclick="abrirModalFinalizar()">Finalizar</button>
+                <button id="btn-abrir-cancelar" type="button" class="btn btn-danger" onclick="abrirConfirmarCancelar()">Cancelar manutenção</button>
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: CONFIRMAR CANCELAMENTO (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-confirmar-cancelar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:520px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Confirmar cancelamento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="app-muted">
+                    Tem certeza que deseja cancelar a manutenção <b id="c-codigo"></b>?
+                    <br />Isso vai liberar o patrimônio novamente.
+                </div>
+
+                <form asp-action="Cancelar" method="post" class="mt-3 d-flex justify-content-end gap-2">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="cancelar-id" name="id" />
+                    <button type="submit" class="btn btn-danger">Sim, cancelar</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Voltar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: FINALIZAR (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-finalizar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Finalizar Manutenção</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="Finalizar" method="post" id="form-finalizar">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="finalizar-id" name="id" />
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Código</label>
+                            <input class="form-control" id="f-codigo" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Status</label>
+                            <input class="form-control" value="Em andamento" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Patrimônio</label>
+                            <input class="form-control" id="f-patrimonio" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Tipo de Patrimônio</label>
+                            <input class="form-control" id="f-tipopatrimonio" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Tipo de Manutenção</label>
+                            <input class="form-control" id="f-tipomanut" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Manutentor</label>
+                            <input class="form-control" id="f-manutentor" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Aberta em</label>
+                            <input class="form-control" id="f-abertaem" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Aberta por</label>
+                            <input class="form-control" id="f-abertapor" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Custo estimado</label>
+                            <input class="form-control" id="f-custoestimado" readonly tabindex="-1" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Data finalizada</label>
+                            <input class="form-control" name="dataFinalizada" type="date" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label app-label">Observações finais</label>
+                            <textarea class="form-control" name="observacoesFinais" rows="3"></textarea>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Custo final</label>
+                            <input class="form-control" name="custoFinal" type="number" step="0.01" />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label">Status do patrimônio após finalizar <span class="text-danger">*</span></label>
+                            <select class="form-select" name="statusFinalPatrimonio" required>
+                                <option value="Ativo">Ativo</option>
+                                <option value="Baixado">Baixado</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-primary" type="submit">Finalizar</button>
+                    <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (admin)
+{
+    <div class="modal fade" id="modal-tiposmanut" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable" style="max-width:720px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-white">Tipos de Manutenção</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="app-muted mb-3">Tipo de Patrimônio: <b id="tm-tipo" class="text-white"></b></div>
+
+                    <form id="anti-form" style="display:none;">
+                        @Html.AntiForgeryToken()
+                    </form>
+
+                    <div class="d-flex gap-2 mb-3">
+                        <input id="tm-novo-nome" class="form-control" placeholder="Novo tipo de manutenção..." />
+                        <button type="button" class="btn btn-primary" onclick="tmCriar()">Adicionar</button>
+                    </div>
+
+                    <ul id="tm-lista" class="list-group"></ul>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-tm-editar" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" style="max-width:520px;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-white">Editar tipo de manutenção</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+
+                <div class="modal-body">
+                    <input type="hidden" id="tm-edit-id" />
+
+                    <label class="form-label app-label app-label-required">Nome</label>
+                    <input id="tm-edit-nome" class="form-control" placeholder="Nome do tipo..." />
+
+                    <div id="tm-edit-erro" class="text-danger small mt-2" style="display:none;"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" onclick="tmSalvarEdicao()">Salvar</button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="tmCancelarEdicao()">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        let manutencaoAtual = null;
+
+        const patrimonios = @Html.Raw(patrimoniosJs);
+        const manutentores = @Html.Raw(manutentoresJs);
+        const isAdmin = @((admin ? "true" : "false"));
+
+        const patrimoniosFiltro = @Html.Raw(patrimoniosFiltroJs);
+        const usuariosFiltro = @Html.Raw(usuariosFiltroJs);
+
+        function showModal(id) {
+            const el = document.getElementById(id);
+            const m = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true });
+            m.show();
+        }
+        function hideModal(id) {
+            const el = document.getElementById(id);
+            const m = bootstrap.Modal.getOrCreateInstance(el);
+            m.hide();
+        }
+
+        function getAntiForgeryToken() {
+            const el = document.querySelector('#anti-form input[name="__RequestVerificationToken"]');
+            return el ? el.value : '';
+        }
+
+        function esconderListasCombobox() {
+            const p = document.getElementById('patrimonio-opcoes');
+            const m = document.getElementById('manutentor-opcoes');
+            if (p) p.style.display = 'none';
+            if (m) m.style.display = 'none';
+
+            const fp = document.getElementById('filtro-patrimonio-opcoes');
+            const fu = document.getElementById('filtro-usuario-opcoes');
+            if (fp) fp.style.display = 'none';
+            if (fu) fu.style.display = 'none';
+        }
+
+        document.addEventListener('click', function (e) {
+            const pc1 = document.getElementById('patrimonio-opcoes');
+            const pc2 = document.getElementById('manutentor-opcoes');
+            const in1 = document.getElementById('patrimonio-busca');
+            const in2 = document.getElementById('manutentor-busca');
+
+            if (pc1 && in1 && !pc1.contains(e.target) && e.target !== in1) pc1.style.display = 'none';
+            if (pc2 && in2 && !pc2.contains(e.target) && e.target !== in2) pc2.style.display = 'none';
+
+            const fp = document.getElementById('filtro-patrimonio-opcoes');
+            const fu = document.getElementById('filtro-usuario-opcoes');
+            const ip = document.getElementById('filtro-patrimonio-texto');
+            const iu = document.getElementById('filtro-usuario-texto');
+
+            if (fp && ip && !fp.contains(e.target) && e.target !== ip) fp.style.display = 'none';
+            if (fu && iu && !fu.contains(e.target) && e.target !== iu) fu.style.display = 'none';
+        });
+
+        document.addEventListener('hidden.bs.modal', function (e) {
+            esconderListasCombobox();
+        });
+
+        function filtrarPatrimoniosFiltro() {
+            const input = document.getElementById('filtro-patrimonio-texto');
+            const lista = document.getElementById('filtro-patrimonio-opcoes');
+            const q = (input?.value || '').toLowerCase().trim();
+
+            const hid = document.getElementById('filtro-patrimonio-id');
+            if (hid) hid.value = '0';
+
+            if (!lista) return;
+            if (!q) { lista.style.display = 'none'; return; }
+
+            const filtrados = patrimoniosFiltro
+                .filter(p => (p.numero || '').toLowerCase().includes(q) || (p.descricao || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                lista.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum patrimônio encontrado.</div>`;
+                lista.style.display = 'block';
+                return;
+            }
+
+            lista.innerHTML = filtrados.map(p => `
+                <div class="app-combobox-item" onclick="selecionarPatrimonioFiltro(${p.id})">
+                    <div><b>${escapeHtml(p.numero || '')}</b> - ${escapeHtml(p.descricao || '')}</div>
+                </div>
+            `).join('');
+
+            lista.style.display = 'block';
+        }
+
+        function selecionarPatrimonioFiltro(id) {
+            const p = patrimoniosFiltro.find(x => x.id === id);
+            if (!p) return;
+
+            const hid = document.getElementById('filtro-patrimonio-id');
+            const input = document.getElementById('filtro-patrimonio-texto');
+            const lista = document.getElementById('filtro-patrimonio-opcoes');
+
+            if (hid) hid.value = String(p.id);
+            if (input) input.value = `${p.numero || ''} - ${p.descricao || ''}`.trim();
+            if (lista) lista.style.display = 'none';
+        }
+
+        function filtrarUsuariosFiltro() {
+            const input = document.getElementById('filtro-usuario-texto');
+            const lista = document.getElementById('filtro-usuario-opcoes');
+            const q = (input?.value || '').toLowerCase().trim();
+
+            const hid = document.getElementById('filtro-usuario-id');
+            if (hid) hid.value = '0';
+
+            if (!lista) return;
+            if (!q) { lista.style.display = 'none'; return; }
+
+            const filtrados = usuariosFiltro
+                .filter(u =>
+                    (u.codigo || '').toLowerCase().includes(q) ||
+                    (u.nome || '').toLowerCase().includes(q) ||
+                    (u.sobrenome || '').toLowerCase().includes(q) ||
+                    (u.email || '').toLowerCase().includes(q) ||
+                    (((u.nome || '') + ' ' + (u.sobrenome || '')).toLowerCase().includes(q))
+                )
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                lista.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum usuário encontrado.</div>`;
+                lista.style.display = 'block';
+                return;
+            }
+
+            lista.innerHTML = filtrados.map(u => `
+                <div class="app-combobox-item" onclick="selecionarUsuarioFiltro(${u.id})">
+                    <div><b>${escapeHtml(u.codigo || '')}</b> - ${escapeHtml(((u.nome || '') + ' ' + (u.sobrenome || '')).trim())}</div>
+                    <small>${escapeHtml(u.email || '')}</small>
+                </div>
+            `).join('');
+
+            lista.style.display = 'block';
+        }
+
+        function selecionarUsuarioFiltro(id) {
+            const u = usuariosFiltro.find(x => x.id === id);
+            if (!u) return;
+
+            const hid = document.getElementById('filtro-usuario-id');
+            const input = document.getElementById('filtro-usuario-texto');
+            const lista = document.getElementById('filtro-usuario-opcoes');
+
+            if (hid) hid.value = String(u.id);
+            if (input) input.value = `${u.codigo || ''} - ${((u.nome || '') + ' ' + (u.sobrenome || '')).trim()}`.trim();
+            if (lista) lista.style.display = 'none';
+        }
+
+        function abrirCriarManutencao() {
+            const form = document.getElementById('form-criar-manutencao');
+            if (form) form.reset();
+
+            document.getElementById('create-abertaem').value = new Date().toLocaleString("pt-BR");
+
+            document.getElementById('patrimonioId').value = '';
+            document.getElementById('tipo-patrimonio').value = '';
+            document.getElementById('tipoManutencaoId').innerHTML = '<option value="">Selecione um patrimônio acima...</option>';
+
+            const hintT = document.getElementById('tiposmanut-hint');
+            if (hintT) { hintT.style.display = 'none'; hintT.textContent = ''; }
+
+            const btnGerenciar = document.getElementById('btn-gerenciar-tipos');
+            if (btnGerenciar) btnGerenciar.style.display = 'none';
+
+            const hintP = document.getElementById('patrimonio-hint');
+            if (hintP) { hintP.style.display = 'none'; hintP.textContent = ''; }
+
+            document.getElementById('manutentorId').value = '';
+
+            showModal('modal-criar-manutencao');
+        }
+
+        function filtrarPatrimonios() {
+            const input = document.getElementById('patrimonio-busca');
+            const lista = document.getElementById('patrimonio-opcoes');
+            const q = (input.value || '').toLowerCase().trim();
+
+            document.getElementById('patrimonioId').value = '';
+            document.getElementById('tipo-patrimonio').value = '';
+            resetTiposManutencao();
+
+            if (!q) { lista.style.display = 'none'; return; }
+
+            const filtrados = patrimonios
+                .filter(p => (p.numero || '').toLowerCase().includes(q) || (p.descricao || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                lista.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum patrimônio encontrado.</div>`;
+                lista.style.display = 'block';
+                return;
+            }
+
+            lista.innerHTML = filtrados.map(p => `
+                <div class="app-combobox-item" onclick="selecionarPatrimonio(${p.id})">
+                    <div><b>${escapeHtml(p.numero || '')}</b> - ${escapeHtml(p.descricao || '')}</div>
+                    <small class="app-muted">Status: ${escapeHtml(p.status || '-')} • Tipo: ${escapeHtml(p.tipo || '-')}</small>
+                </div>
+            `).join('');
+
+            lista.style.display = 'block';
+        }
+
+        function selecionarPatrimonio(id) {
+            const p = patrimonios.find(x => x.id === id);
+            if (!p) return;
+
+            document.getElementById('patrimonioId').value = p.id;
+            document.getElementById('patrimonio-busca').value = `${p.numero} - ${p.descricao}`.trim();
+            document.getElementById('tipo-patrimonio').value = p.tipo || '';
+
+            const hint = document.getElementById('patrimonio-hint');
+            if (p.status && p.status.toLowerCase().includes('manutenção')) {
+                hint.textContent = `Atenção: este patrimônio já está com status "${p.status}". Se estiver em manutenção, o sistema vai bloquear nova abertura.`;
+                hint.style.display = 'block';
+            } else {
+                hint.style.display = 'none';
+            }
+
+            document.getElementById('patrimonio-opcoes').style.display = 'none';
+            carregarTiposManutencao(p.tipo);
+        }
+
+        function resetTiposManutencao() {
+            const sel = document.getElementById('tipoManutencaoId');
+            sel.innerHTML = '<option value="">Selecione um patrimônio acima...</option>';
+
+            const hint = document.getElementById('tiposmanut-hint');
+            hint.style.display = 'none';
+            hint.textContent = '';
+
+            const btnGerenciar = document.getElementById('btn-gerenciar-tipos');
+            if (btnGerenciar) btnGerenciar.style.display = 'none';
+        }
+
+        function carregarTiposManutencao(tipoPatrimonio, selecionarNome) {
+            const sel = document.getElementById('tipoManutencaoId');
+            const hint = document.getElementById('tiposmanut-hint');
+            const btnGerenciar = document.getElementById('btn-gerenciar-tipos');
+
+            sel.innerHTML = '<option value="">Carregando...</option>';
+            hint.style.display = 'none';
+            hint.textContent = '';
+
+            if (btnGerenciar) btnGerenciar.style.display = 'none';
+
+            if (!tipoPatrimonio) {
+                sel.innerHTML = '<option value="">Tipo de patrimônio não definido.</option>';
+                return;
+            }
+
+            fetch(`/TiposManutencao/ListarPorTipo?nomeTipoPatrimonio=${encodeURIComponent(tipoPatrimonio)}`)
+                .then(r => r.ok ? r.json() : [])
+                .then(lista => {
+                    if (!lista || !lista.length) {
+                        sel.innerHTML = '<option value="">Nenhum tipo cadastrado</option>';
+
+                        if (isAdmin && btnGerenciar) {
+                            btnGerenciar.style.display = 'inline-flex';
+                        } else {
+                            hint.textContent = 'Não há tipos de manutenção cadastrados para este tipo. Solicite a um administrador.';
+                            hint.style.display = 'block';
+                        }
+                        return;
+                    }
+
+                    sel.innerHTML = '<option value="">Selecione...</option>' +
+                        lista.map(x => `<option value="${x.id}">${escapeHtml(x.nome)}</option>`).join('');
+
+                    if (isAdmin && btnGerenciar) {
+                        btnGerenciar.style.display = 'inline-flex';
+                    }
+
+                    if (selecionarNome) {
+                        const alvo = (selecionarNome || '').trim().toLowerCase();
+                        const opt = Array.from(sel.options).find(o => (o.textContent || '').trim().toLowerCase() === alvo);
+                        if (opt) sel.value = opt.value;
+                    }
+                })
+                .catch(() => {
+                    sel.innerHTML = '<option value="">Erro ao carregar tipos</option>';
+                    hint.textContent = 'Erro ao carregar tipos de manutenção.';
+                    hint.style.display = 'block';
+
+                    if (isAdmin && btnGerenciar) {
+                        btnGerenciar.style.display = 'inline-flex';
+                    }
+                });
+        }
+
+        function filtrarManutentores() {
+            const input = document.getElementById('manutentor-busca');
+            const lista = document.getElementById('manutentor-opcoes');
+            const q = (input.value || '').toLowerCase().trim();
+
+            document.getElementById('manutentorId').value = '';
+
+            if (!q) { lista.style.display = 'none'; return; }
+
+            const filtrados = manutentores
+                .filter(m => (m.nome || '').toLowerCase().includes(q))
+                .slice(0, 25);
+
+            if (!filtrados.length) {
+                lista.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum manutentor encontrado.</div>`;
+                lista.style.display = 'block';
+                return;
+            }
+
+            lista.innerHTML = filtrados.map(m => `
+                <div class="app-combobox-item" onclick="selecionarManutentor(${m.id})">
+                    ${escapeHtml(m.nome || '')}
+                </div>
+            `).join('');
+
+            lista.style.display = 'block';
+        }
+
+        function selecionarManutentor(id) {
+            const m = manutentores.find(x => x.id === id);
+            if (!m) return;
+
+            document.getElementById('manutentorId').value = m.id;
+            document.getElementById('manutentor-busca').value = m.nome || '';
+            document.getElementById('manutentor-opcoes').style.display = 'none';
+        }
+
+        function formatarDataHoraBr(iso) {
+            if (!iso) return "";
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return "";
+            return d.toLocaleString("pt-BR");
+        }
+
+        function formatarMoeda(valor) {
+            if (valor === null || valor === undefined || valor === "") return "";
+            const n = Number(valor);
+            if (isNaN(n)) return valor;
+            return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        }
+
+        function codigoUsrPorId(id) {
+            if (!id || id <= 0) return "";
+            return "USR" + String(id).padStart(3, "0");
+        }
+
+        function abrirVerManutencao(btn) {
+            const json = btn.getAttribute('data-manutencao') || '{}';
+            let m = {};
+            try { m = JSON.parse(json); } catch { }
+
+            manutencaoAtual = m;
+
+            const setVal = (id, val) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.value = val ?? "";
+            };
+
+            setVal('m-codigo', m.codigo || "");
+            setVal('m-status', m.status || "");
+            setVal('m-patrimonio', `${m.patrimonioNumero || ""} - ${m.patrimonioDescricao || ""}`.trim());
+            setVal('m-tipopatrimonio', m.tipoPatrimonio || "-");
+            setVal('m-tipomanut', m.tipoManutencaoNome || "-");
+            setVal('m-manutentor', m.manutentorNome || "-");
+            setVal('m-abertaem', formatarDataHoraBr(m.abertaEm));
+
+            const cod = (m.abertaPorCodigo || "").trim() || codigoUsrPorId(m.abertaPorId);
+            const nome = `${m.abertaPorNome || ""} ${m.abertaPorSobrenome || ""}`.trim();
+            setVal('m-abertapor', `${cod}${nome ? " • " + nome : ""}`.trim() || "-");
+
+            setVal('m-custoestimado', formatarMoeda(m.custoEstimado));
+            setVal('m-finalizadaem', formatarDataHoraBr(m.finalizadaEm));
+            setVal('m-custofinal', formatarMoeda(m.custoFinal));
+            setVal('m-statusfinal', m.statusFinalPatrimonio || "");
+            setVal('m-observacoesfinais', m.observacoesFinais || "");
+
+            const encerrada = (m.status === "Finalizada" || m.status === "Cancelada");
+            const btnFinalizar = document.getElementById('btn-abrir-finalizar');
+            const btnCancelar = document.getElementById('btn-abrir-cancelar');
+
+            if (btnFinalizar) btnFinalizar.style.display = encerrada ? 'none' : 'inline-flex';
+            if (btnCancelar) btnCancelar.style.display = encerrada ? 'none' : 'inline-flex';
+
+            showModal('modal-ver-manutencao');
+        }
+
+        function abrirConfirmarCancelar() {
+            if (!manutencaoAtual) return;
+            document.getElementById('c-codigo').textContent = manutencaoAtual.codigo || "";
+            document.getElementById('cancelar-id').value = manutencaoAtual.id || 0;
+            showModal('modal-confirmar-cancelar');
+        }
+
+        function abrirModalFinalizar() {
+            if (!manutencaoAtual) return;
+
+            document.getElementById('finalizar-id').value = manutencaoAtual.id || 0;
+            document.getElementById('f-codigo').value = manutencaoAtual.codigo || "";
+            document.getElementById('f-patrimonio').value = `${manutencaoAtual.patrimonioNumero || ""} - ${manutencaoAtual.patrimonioDescricao || ""}`.trim();
+            document.getElementById('f-tipopatrimonio').value = manutencaoAtual.tipoPatrimonio || "-";
+            document.getElementById('f-tipomanut').value = manutencaoAtual.tipoManutencaoNome || "-";
+            document.getElementById('f-manutentor').value = manutencaoAtual.manutentorNome || "-";
+            document.getElementById('f-abertaem').value = formatarDataHoraBr(manutencaoAtual.abertaEm);
+
+            const cod = (manutencaoAtual.abertaPorCodigo || "").trim() || codigoUsrPorId(manutencaoAtual.abertaPorId);
+            const nome = `${manutencaoAtual.abertaPorNome || ""} ${manutencaoAtual.abertaPorSobrenome || ""}`.trim();
+            document.getElementById('f-abertapor').value = `${cod}${nome ? " • " + nome : ""}`.trim() || "-";
+
+            document.getElementById('f-custoestimado').value = formatarMoeda(manutencaoAtual.custoEstimado);
+
+            showModal('modal-finalizar');
+        }
+
+        let tmTipoAtual = "";
+
+        function abrirModalTiposManutencao() {
+            const tipo = document.getElementById('tipo-patrimonio').value || "";
+            if (!tipo) return;
+
+            tmTipoAtual = tipo;
+            document.getElementById('tm-tipo').textContent = tmTipoAtual;
+            document.getElementById('tm-novo-nome').value = "";
+            document.getElementById('tm-lista').innerHTML = `<li class="list-group-item app-muted">Carregando...</li>`;
+
+            showModal('modal-tiposmanut');
+            tmCarregar();
+        }
+
+        function tmCarregar() {
+            fetch(`/TiposManutencao/ListarPorTipo?nomeTipoPatrimonio=${encodeURIComponent(tmTipoAtual)}`)
+                .then(r => r.ok ? r.json() : [])
+                .then(lista => {
+                    const ul = document.getElementById('tm-lista');
+                    if (!lista || !lista.length) {
+                        ul.innerHTML = `<li class="list-group-item app-muted">Nenhum tipo cadastrado para este tipo de patrimônio.</li>`;
+                        return;
+                    }
+
+                    ul.innerHTML = lista.map(x => `
+                        <li class="list-group-item d-flex justify-content-between align-items-center" data-id="${x.id}">
+                            <span class="tm-nome text-white">${escapeHtml(x.nome)}</span>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="tmAbrirEditar(${x.id})">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </li>
+                    `).join('');
+                })
+                .catch(() => {
+                    document.getElementById('tm-lista').innerHTML = `<li class="list-group-item text-danger">Erro ao carregar.</li>`;
+                });
+        }
+
+        function tmAbrirEditar(id) {
+            const li = document.querySelector(`#tm-lista li[data-id="${id}"]`);
+            const atual = li ? (li.querySelector('.tm-nome')?.textContent || "") : "";
+
+            document.getElementById('tm-edit-id').value = id;
+            document.getElementById('tm-edit-nome').value = (atual || "").trim();
+
+            const erro = document.getElementById('tm-edit-erro');
+            if (erro) { erro.style.display = 'none'; erro.textContent = ''; }
+
+            hideModal('modal-tiposmanut');
+            setTimeout(() => {
+                showModal('modal-tm-editar');
+                setTimeout(() => document.getElementById('tm-edit-nome')?.focus(), 150);
+            }, 200);
+        }
+
+        function tmCancelarEdicao() {
+            hideModal('modal-tm-editar');
+            setTimeout(() => showModal('modal-tiposmanut'), 200);
+        }
+
+        function tmSalvarEdicao() {
+            const id = Number(document.getElementById('tm-edit-id').value || 0);
+            const nome = (document.getElementById('tm-edit-nome').value || '').trim();
+
+            const erro = document.getElementById('tm-edit-erro');
+            const showErr = (msg) => {
+                if (!erro) return;
+                erro.textContent = msg;
+                erro.style.display = 'block';
+            };
+
+            if (!id) return showErr('Registro inválido.');
+            if (!nome) return showErr('Informe um nome.');
+
+            const token = getAntiForgeryToken();
+            const body = new URLSearchParams();
+            body.append("__RequestVerificationToken", token);
+            body.append("id", id);
+            body.append("nome", nome);
+
+            fetch('/TiposManutencao/Edit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            })
+                .then(r => {
+                    if (!r.ok) throw new Error();
+                    hideModal('modal-tm-editar');
+                    setTimeout(() => {
+                        showModal('modal-tiposmanut');
+                        tmCarregar();
+                        carregarTiposManutencao(tmTipoAtual, nome);
+                    }, 200);
+                })
+                .catch(() => showErr('Erro ao editar tipo de manutenção.'));
+        }
+
+        function tmCriar() {
+            const nome = (document.getElementById('tm-novo-nome').value || '').trim();
+            if (!nome) return;
+
+            const token = getAntiForgeryToken();
+            const body = new URLSearchParams();
+            body.append("__RequestVerificationToken", token);
+            body.append("nomeTipoPatrimonio", tmTipoAtual);
+            body.append("nome", nome);
+
+            fetch('/TiposManutencao/Create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString()
+            })
+                .then(r => {
+                    if (!r.ok) throw new Error();
+                    document.getElementById('tm-novo-nome').value = "";
+                    tmCarregar();
+                    carregarTiposManutencao(tmTipoAtual, nome);
+                })
+                .catch(() => alert('Erro ao criar tipo de manutenção.'));
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        (function () {
+            const form = document.getElementById('form-criar-manutencao');
+            if (!form) return;
+
+            form.addEventListener('submit', function (e) {
+                const patrimonioId = (document.getElementById('patrimonioId').value || '').trim();
+                const tipoManutId = (document.getElementById('tipoManutencaoId').value || '').trim();
+                let ok = true;
+
+                const hintP = document.getElementById('patrimonio-hint');
+                if (!patrimonioId) {
+                    if (hintP) {
+                        hintP.textContent = 'Selecione um patrimônio na lista.';
+                        hintP.style.display = 'block';
+                    }
+                    ok = false;
+                } else {
+                    if (hintP && hintP.textContent.startsWith('Selecione um patrimônio')) hintP.style.display = 'none';
+                }
+
+                const hintT = document.getElementById('tiposmanut-hint');
+                if (!tipoManutId) {
+                    if (hintT) {
+                        hintT.textContent = 'Selecione um tipo de manutenção.';
+                        hintT.style.display = 'block';
+                    }
+                    ok = false;
+                }
+
+                if (!ok) e.preventDefault();
+            });
+        })();
+    </script>
+}

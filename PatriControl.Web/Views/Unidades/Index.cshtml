@@ -1,0 +1,509 @@
+﻿@using System.Text.Json
+@using PatriControl.Web.Models
+@model IEnumerable<PatriControl.Web.Models.Unidade>
+
+@{
+    ViewData["Title"] = "Unidades";
+
+    string filtro = ViewBag.Filtro as string ?? "";
+
+    int total = ViewBag.Total is int t ? t : Model.Count();
+    int paginaAtual = ViewBag.Page is int p ? p : 1;
+    int pageSize = ViewBag.PageSize is int ps ? ps : 10;
+    int totalPages = ViewBag.TotalPages is int tp ? tp : 1;
+    int exibindo = ViewBag.Exibindo is int ex ? ex : Model.Count();
+}
+
+<!-- Header -->
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="mb-1 text-white">Unidades</h4>
+        <div class="app-muted">Cadastro de unidades (PER + nome).</div>
+    </div>
+
+    <button type="button"
+            onclick="abrirModalNovaUnidade()"
+            class="app-icon-btn"
+            aria-label="Adicionar unidade"
+            title="Adicionar unidade">
+        <i class="bi bi-plus-square-fill" style="font-size:34px;"></i>
+    </button>
+</div>
+
+<div class="app-card p-3">
+
+    <!-- Cabeçalho do bloco de filtros -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="text-white fw-semibold">Filtros</div>
+
+        <div class="app-muted small text-end">
+            Total: <b class="text-white">@total</b>
+            <span class="mx-1">•</span>
+            Página <b class="text-white">@paginaAtual</b>/<b class="text-white">@totalPages</b>
+            <span class="mx-1">•</span>
+            Exibindo <b class="text-white">@exibindo</b>
+        </div>
+    </div>
+
+    <!-- FILTRO SERVER SIDE -->
+    <form method="get" asp-action="Index" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="page" value="1" />
+        <input type="hidden" name="pageSize" value="@pageSize" />
+
+        <div class="col-12 col-md-7">
+            <label class="app-label mb-1">Buscar</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text"
+                       name="filtro"
+                       value="@filtro"
+                       class="form-control"
+                       placeholder="Filtrar por PER ou nome..." />
+            </div>
+        </div>
+
+        <div class="col-12 col-md-auto">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" style="min-width:110px;">
+                    Filtrar
+                </button>
+
+                <a asp-action="Index"
+                   class="btn btn-outline-secondary"
+                   style="min-width:110px;">
+                    Limpar
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-dark-soft table-hover align-middle mb-0">
+            <thead>
+                <tr class="app-table-head">
+                    <th style="width:140px;">PER</th>
+                    <th>NOME</th>
+                    <th style="width:110px;" class="text-end">AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody id="lista-unidades">
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="3" class="app-muted">Nenhuma unidade cadastrada.</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var u in Model)
+                    {
+                        var locsJson = JsonSerializer.Serialize(
+                        u.Localizacoes.Select(l => new { id = l.Id, nome = l.Nome })
+                        );
+
+                        <tr>
+                            <td class="fw-semibold text-white">@u.Per</td>
+                            <td class="text-white">@u.Nome</td>
+                            <td class="text-end">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        data-unidade-id="@u.Id"
+                                        data-unidade-per="@u.Per"
+                                        data-unidade-nome="@u.Nome"
+                                        data-localizacoes='@Html.Raw(locsJson)'
+                                        onclick="abrirModalEdicaoUnidade(this)">
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginação (padrão do sistema) -->
+    @if (ViewBag.Paginacao != null && totalPages > 1)
+    {
+        <div class="mt-3">
+            @* cast para object evita CS1973 com ViewBag (dynamic) *@
+            @await Html.PartialAsync("_paginacao", (object)ViewBag.Paginacao)
+        </div>
+    }
+</div>
+
+<!-- =================================================
+   MODAL: NOVA UNIDADE
+   ================================================= -->
+<div class="modal fade" id="modal-nova-unidade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Nova Unidade</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="Create" method="post">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label app-label app-label-required">PER (4 dígitos)</label>
+                            <input class="form-control" name="Per" maxlength="4" required />
+                        </div>
+
+                        <div class="col-12 col-md-8">
+                            <label class="form-label app-label app-label-required">Nome da Unidade</label>
+                            <input class="form-control" name="Nome" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: EDITAR UNIDADE + LOCALIZAÇÕES
+   ================================================= -->
+<div class="modal fade" id="modal-unidade" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Editar Unidade</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <div class="modal-body">
+                <form asp-action="Edit" method="post" class="mb-3" id="form-editar-unidade">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="Id" id="edit-unidade-id" />
+
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-md-3">
+                            <label class="form-label app-label app-label-required">PER (4 dígitos)</label>
+                            <input name="Per" id="edit-unidade-per" class="form-control" maxlength="4" required />
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label app-label app-label-required">Nome da Unidade</label>
+                            <input name="Nome" id="edit-unidade-nome" class="form-control" required />
+                        </div>
+
+                        <div class="col-12 col-md-3 d-flex gap-2">
+                            <button class="btn btn-primary w-100" type="submit">Salvar</button>
+                            <button class="btn btn-outline-secondary w-100" type="button" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                    </div>
+                </form>
+
+                <hr class="app-divider" />
+
+                <div class="text-white fw-semibold mb-2">Localizações desta unidade</div>
+
+                <div class="app-card-2 p-3">
+                    <ul id="lista-localizacoes" class="app-list-clean mb-0"></ul>
+                </div>
+
+                <hr class="app-divider" />
+
+                <div class="text-white fw-semibold mb-2">Nova localização</div>
+
+                <!--  AJAX (não fecha modal) -->
+                <form asp-action="AdicionarLocalizacao" method="post" class="row g-2 align-items-end" id="form-adicionar-localizacao">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="unidadeId" id="nova-localizacao-unidade-id" />
+
+                    <div class="col-12 col-md-8">
+                        <label class="form-label app-label">Nome</label>
+                        <input type="text" name="nome" id="nova-localizacao-nome" class="form-control" placeholder="Ex: Suprimentos" required />
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <button type="submit" class="btn btn-primary w-100">Adicionar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: EDITAR LOCALIZAÇÃO (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-editar-localizacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Editar Localização</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="EditarLocalizacao" method="post" id="form-editar-localizacao-modal">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="edit-local-id" />
+
+                <div class="modal-body">
+                    <label class="form-label app-label app-label-required">Nome</label>
+                    <input type="text" name="nome" id="edit-local-nome" class="form-control" required />
+                    <div class="app-muted small mt-2">Altere o nome e clique em salvar.</div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: CONFIRMAR EXCLUSÃO (Bootstrap)
+   ================================================= -->
+<div class="modal fade" id="modal-excluir-localizacao" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Excluir Localização</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="ExcluirLocalizacao" method="post" id="form-excluir-localizacao-modal">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="delete-local-id" />
+
+                <div class="modal-body">
+                    <div class="text-white">
+                        Tem certeza que deseja excluir a localização:
+                        <b id="delete-local-nome"></b>?
+                    </div>
+                    <div class="app-muted small mt-2">
+                        Isso também removerá a Localização dos patrimônios que estiverem usando ela.
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-danger">Excluir</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const urlListLocalizacoes = '@Url.Action("Localizacoes", "Unidades")';
+        const urlAddLocalizacao   = '@Url.Action("AdicionarLocalizacao", "Unidades")';
+        const urlEditLocalizacao  = '@Url.Action("EditarLocalizacao", "Unidades")';
+        const urlDelLocalizacao   = '@Url.Action("ExcluirLocalizacao", "Unidades")';
+
+        let unidadeAtualId = null;
+
+        function showModal(id) {
+            const el = document.getElementById(id);
+            const m = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true });
+            m.show();
+        }
+
+        function abrirModalNovaUnidade() {
+            const el = document.getElementById('modal-nova-unidade');
+            const form = el.querySelector('form');
+            if (form) form.reset();
+            showModal('modal-nova-unidade');
+        }
+
+        async function carregarLocalizacoes(unidadeId) {
+            const listaEl = document.getElementById('lista-localizacoes');
+            listaEl.innerHTML = `<li class="app-muted">Carregando...</li>`;
+
+            const resp = await fetch(`${urlListLocalizacoes}?unidadeId=${encodeURIComponent(unidadeId)}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+
+            if (!resp.ok) {
+                listaEl.innerHTML = `<li class="app-muted">Erro ao carregar localizações.</li>`;
+                return;
+            }
+
+            const data = await resp.json();
+            if (!data || !data.ok) {
+                listaEl.innerHTML = `<li class="app-muted">Erro ao carregar localizações.</li>`;
+                return;
+            }
+
+            renderLocalizacoes(data.localizacoes || []);
+        }
+
+        function renderLocalizacoes(localizacoes) {
+            const listaEl = document.getElementById('lista-localizacoes');
+
+            if (!localizacoes.length) {
+                listaEl.innerHTML = `<li class="app-muted">Nenhuma localização cadastrada.</li>`;
+                return;
+            }
+
+            listaEl.innerHTML = localizacoes.map(l => `
+                <li class="app-list-row">
+                    <span class="text-white">${escapeHtml(l.nome || "")}</span>
+                    <div class="d-flex gap-2">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary js-edit-local"
+                                data-id="${l.id}"
+                                data-nome="${encodeURIComponent(l.nome || "")}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary js-del-local"
+                                data-id="${l.id}"
+                                data-nome="${encodeURIComponent(l.nome || "")}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function abrirModalEdicaoUnidade(botao) {
+            const id = botao.getAttribute('data-unidade-id');
+            const per = botao.getAttribute('data-unidade-per');
+            const nome = botao.getAttribute('data-unidade-nome');
+
+            unidadeAtualId = id;
+
+            document.getElementById('edit-unidade-id').value = id;
+            document.getElementById('edit-unidade-per').value = per;
+            document.getElementById('edit-unidade-nome').value = nome;
+            document.getElementById('nova-localizacao-unidade-id').value = id;
+
+            // abre modal e carrega localizações do server
+            showModal('modal-unidade');
+            carregarLocalizacoes(id);
+        }
+
+        // Clique nos botões de editar/excluir (delegação)
+        document.addEventListener('DOMContentLoaded', function () {
+            const lista = document.getElementById('lista-localizacoes');
+            if (lista) {
+                lista.addEventListener('click', function (e) {
+                    const btnEdit = e.target.closest('.js-edit-local');
+                    const btnDel = e.target.closest('.js-del-local');
+
+                    if (btnEdit) {
+                        const id = btnEdit.getAttribute('data-id');
+                        const nome = decodeURIComponent(btnEdit.getAttribute('data-nome') || '');
+                        abrirModalEditarLocalizacao(id, nome);
+                    }
+
+                    if (btnDel) {
+                        const id = btnDel.getAttribute('data-id');
+                        const nome = decodeURIComponent(btnDel.getAttribute('data-nome') || '');
+                        abrirModalExcluirLocalizacao(id, nome);
+                    }
+                });
+            }
+
+            //  adicionar localização via AJAX (não fecha modal)
+            const formAdd = document.getElementById('form-adicionar-localizacao');
+            if (formAdd) {
+                formAdd.addEventListener('submit', async function (ev) {
+                    ev.preventDefault();
+
+                    const fd = new FormData(formAdd);
+
+                    const resp = await fetch(urlAddLocalizacao, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+
+                    if (!resp.ok) return;
+
+                    const data = await resp.json();
+                    if (data && data.ok) {
+                        renderLocalizacoes(data.localizacoes || []);
+                        // limpa input e mantém modal aberto
+                        const inp = document.getElementById('nova-localizacao-nome');
+                        if (inp) { inp.value = ''; inp.focus(); }
+                    }
+                });
+            }
+
+            //  editar localização via AJAX
+            const formEdit = document.getElementById('form-editar-localizacao-modal');
+            if (formEdit) {
+                formEdit.addEventListener('submit', async function (ev) {
+                    ev.preventDefault();
+
+                    const fd = new FormData(formEdit);
+
+                    const resp = await fetch(urlEditLocalizacao, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+
+                    if (!resp.ok) return;
+
+                    const data = await resp.json();
+                    if (data && data.ok) {
+                        renderLocalizacoes(data.localizacoes || []);
+                        bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-editar-localizacao')).hide();
+                    }
+                });
+            }
+
+            //  excluir localização via AJAX
+            const formDel = document.getElementById('form-excluir-localizacao-modal');
+            if (formDel) {
+                formDel.addEventListener('submit', async function (ev) {
+                    ev.preventDefault();
+
+                    const fd = new FormData(formDel);
+
+                    const resp = await fetch(urlDelLocalizacao, {
+                        method: 'POST',
+                        body: fd,
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
+
+                    if (!resp.ok) return;
+
+                    const data = await resp.json();
+                    if (data && data.ok) {
+                        renderLocalizacoes(data.localizacoes || []);
+                        bootstrap.Modal.getOrCreateInstance(document.getElementById('modal-excluir-localizacao')).hide();
+                    }
+                });
+            }
+        });
+
+        function abrirModalEditarLocalizacao(id, nomeAtual) {
+            document.getElementById('edit-local-id').value = id;
+            document.getElementById('edit-local-nome').value = nomeAtual || '';
+            showModal('modal-editar-localizacao');
+        }
+
+        function abrirModalExcluirLocalizacao(id, nomeAtual) {
+            document.getElementById('delete-local-id').value = id;
+            document.getElementById('delete-local-nome').textContent = nomeAtual || '';
+            showModal('modal-excluir-localizacao');
+        }
+
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+    </script>
+}

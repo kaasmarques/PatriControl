@@ -1,0 +1,207 @@
+﻿@using System.Text.Json
+@model IEnumerable<PatriControl.Web.Models.Fornecedor>
+
+@{
+    ViewData["Title"] = "Fornecedores";
+
+    string filtro = ViewBag.Filtro as string ?? "";
+    int total = ViewBag.Total != null ? (int)ViewBag.Total : (Model?.Count() ?? 0);
+    int paginaAtual = ViewBag.Page != null ? (int)ViewBag.Page : 1;
+    int totalPages = ViewBag.TotalPages != null ? (int)ViewBag.TotalPages : 1;
+    int exibindo = ViewBag.Exibindo != null ? (int)ViewBag.Exibindo : (Model?.Count() ?? 0);
+    int pageSize = ViewBag.PageSize != null ? (int)ViewBag.PageSize : 10;
+}
+
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="mb-1 text-white">Fornecedores</h4>
+        <div class="app-muted">Gerencie fornecedores cadastrados no sistema.</div>
+    </div>
+
+    <!-- Botão igual ao de Patrimônio -->
+    <button type="button"
+            class="app-icon-btn"
+            aria-label="Adicionar fornecedor"
+            title="Adicionar fornecedor"
+            data-bs-toggle="modal"
+            data-bs-target="#modalNovoFornecedor">
+        <i class="bi bi-plus-square-fill" style="font-size:34px;"></i>
+    </button>
+</div>
+
+<div class="app-card p-3">
+
+    <!-- Cabeçalho do bloco (igual ao padrão Unidades/Patrimônios/Tipos) -->
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="text-white fw-semibold">Filtros</div>
+
+        <div class="app-muted small text-end">
+            Total: <b class="text-white">@total</b>
+            <span class="mx-1">•</span>
+            Página <b class="text-white">@paginaAtual</b>/<b class="text-white">@totalPages</b>
+            <span class="mx-1">•</span>
+            Exibindo <b class="text-white">@exibindo</b>
+        </div>
+    </div>
+
+    <!-- ✅ FILTRO SERVER SIDE (botões AO LADO do input) -->
+    <form method="get" asp-action="Index" class="row g-2 align-items-end mb-3">
+        <!-- Ao filtrar, volta pra página 1 -->
+        <input type="hidden" name="page" value="1" />
+        <input type="hidden" name="pageSize" value="@pageSize" />
+
+        <div class="col-12 col-md-7">
+            <label class="app-label mb-1">Buscar</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text"
+                       name="filtro"
+                       value="@filtro"
+                       class="form-control"
+                       placeholder="Filtrar fornecedores..." />
+            </div>
+        </div>
+
+        <div class="col-12 col-md-auto">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" style="min-width:110px;">
+                    Filtrar
+                </button>
+
+                <a asp-action="Index"
+                   class="btn btn-outline-secondary"
+                   style="min-width:110px;">
+                    Limpar
+                </a>
+            </div>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-dark-soft table-hover align-middle mb-0">
+            <thead>
+                <tr class="app-table-head">
+                    <th>FORNECEDOR</th>
+                    <th style="width:160px;" class="text-end">AÇÕES</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model == null || !Model.Any())
+                {
+                    <tr>
+                        <td colspan="2" class="app-muted">Nenhum fornecedor cadastrado.</td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var f in Model)
+                    {
+                        <tr>
+                            <td class="text-white">@f.Nome</td>
+                            <td class="text-end">
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm"
+                                        onclick='abrirModalEditarFornecedor(@f.Id, @Html.Raw(JsonSerializer.Serialize(f.Nome ?? "")))'>
+                                    Editar
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    <!-- Paginação (padrão do sistema) -->
+    @if (ViewBag.Paginacao != null && totalPages > 1)
+    {
+        <div class="mt-3">
+            @await Html.PartialAsync("_paginacao", (object)ViewBag.Paginacao)
+        </div>
+    }
+</div>
+
+<!-- =========================
+     MODAL: NOVO FORNECEDOR
+     (Bootstrap - padrão Unidades)
+     ========================= -->
+<div class="modal fade" id="modalNovoFornecedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Novo Fornecedor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="Create" method="post" id="formNovoFornecedor">
+                @Html.AntiForgeryToken()
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="app-label app-label-required">Nome</label>
+                        <input class="form-control" name="nome" required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- =========================
+     MODAL: EDITAR FORNECEDOR
+     (Bootstrap - padrão Unidades)
+     ========================= -->
+<div class="modal fade" id="modalEditarFornecedor" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Editar Fornecedor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form asp-action="Edit" method="post" id="formEditarFornecedor">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" id="edit-id" />
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="app-label app-label-required">Nome</label>
+                        <input class="form-control" name="nome" id="edit-nome" required />
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // limpa sempre que abrir o modal de novo
+        document.addEventListener('DOMContentLoaded', function () {
+            const modalNovo = document.getElementById('modalNovoFornecedor');
+            if (modalNovo) {
+                modalNovo.addEventListener('show.bs.modal', function () {
+                    const form = document.getElementById('formNovoFornecedor');
+                    if (form) form.reset();
+                });
+            }
+        });
+
+        function abrirModalEditarFornecedor(id, nome) {
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-nome').value = nome || '';
+
+            const el = document.getElementById('modalEditarFornecedor');
+            bootstrap.Modal.getOrCreateInstance(el).show();
+        }
+    </script>
+}

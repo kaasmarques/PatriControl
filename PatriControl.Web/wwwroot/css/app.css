@@ -1,0 +1,711 @@
+/* ===========================================
+   app.css — Tema DARK (Corona-like) definitivo
+   Primary:  #AF1763
+   BG:       #191C24
+   Support:  #0D6EFD  #198754  #0DCAF0  #AB2E3C  #FFC107
+   =========================================== */
+
+/* ---------- 1) TOKENS / VARS (ÚNICO) ---------- */
+:root,
+[data-bs-theme="dark"] {
+    --app-bg: #191C24;
+    --app-surface: #1F2330;
+    --app-surface-2: #23283A;
+    --app-border: #2B3247;
+    --app-text: #E7EAF1;
+    --app-muted: #9AA4B2;
+    --app-primary: #AF1763;
+    --app-blue: #0D6EFD;
+    --app-success: #198754;
+    --app-info: #0DCAF0;
+    --app-danger: #AB2E3C;
+    --app-warning: #FFC107;
+    /* ===============================
+       STATUS COLORS (Padronização)
+       Ativo                 -> verde (antes: aguardando)
+       Aguardando Manutenção -> azul  (antes: baixado)
+       Baixado               -> vermelho (antes: ativo)
+       Em manutenção          -> amarelo (antes: emprestado)
+       Emprestado            -> NOVA cor (roxo)
+       =============================== */
+    --pc-status-ativo: var(--app-success);
+    --pc-status-aguardando: var(--app-blue);
+    --pc-status-baixado: var(--app-danger);
+    --pc-status-manutencao: var(--app-warning);
+    --pc-status-emprestado: #7C3AED;
+    /* Bootstrap tokens */
+    --bs-body-bg: var(--app-bg);
+    --bs-body-color: var(--app-text);
+    --bs-border-color: var(--app-border);
+    --bs-primary: var(--app-primary);
+    --bs-success: var(--app-success);
+    --bs-info: var(--app-info);
+    --bs-danger: var(--app-danger);
+    --bs-warning: var(--app-warning);
+    --bs-link-color: #cfd6ff;
+    --bs-link-hover-color: #ffffff;
+    --bs-secondary-color: var(--app-muted);
+    --bs-tertiary-bg: var(--app-surface);
+    --bs-secondary-bg: var(--app-surface);
+    --app-radius: 16px;
+    --app-radius-sm: 12px;
+}
+
+/* ---------- 2) BASE ---------- */
+html,
+body {
+    height: 100%;
+}
+
+body,
+.app-body {
+    background: var(--app-bg) !important;
+    color: var(--app-text);
+}
+
+/* texto auxiliar */
+.app-muted,
+.text-secondary {
+    color: var(--app-muted) !important;
+}
+
+/* ---------- 3) TOPBAR / NAVBAR ---------- */
+.navbar,
+.app-topbar {
+    background: rgba(25, 28, 36, 0.86) !important;
+    border-bottom: 1px solid var(--app-border) !important;
+    backdrop-filter: blur(10px);
+}
+
+/* logo (o “P”) */
+.app-logo {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    background: linear-gradient(135deg, #AF1763 0%, #6d1bff 100%);
+    color: #fff;
+}
+
+/* superfície usada no layout (chip do usuário) */
+.app-surface {
+    background: var(--app-surface) !important;
+    border: 1px solid var(--app-border) !important;
+}
+
+/* badge do layout (Admin) */
+.app-badge {
+    background: rgba(175, 23, 99, .20);
+    border: 1px solid rgba(175, 23, 99, .38);
+    color: #fff;
+}
+
+/* ---------- 4) SUPERFÍCIES / CARDS / DROPDOWNS / MODAL ---------- */
+.card,
+.modal-content,
+.dropdown-menu,
+.app-card {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+    border-radius: var(--app-radius);
+}
+
+.app-card-2 {
+    background: var(--app-surface-2);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+}
+
+.dropdown-menu .dropdown-item {
+    color: var(--app-text);
+}
+
+    .dropdown-menu .dropdown-item:hover {
+        background: rgba(255,255,255,.06);
+    }
+
+/* ---------- 5) SIDEBAR ---------- */
+.app-sidebar {
+    background: var(--app-surface) !important;
+    border-color: var(--app-border) !important;
+}
+
+    .app-sidebar ul,
+    .app-sidebar .nav {
+        margin: 0;
+        padding-left: 0;
+        list-style: none;
+    }
+
+    .app-sidebar .nav-link {
+        color: var(--app-muted) !important;
+        border-radius: var(--app-radius-sm);
+        padding: .55rem .75rem;
+    }
+
+        .app-sidebar .nav-link:hover {
+            background: rgba(255,255,255,.06);
+            color: var(--app-text) !important;
+        }
+
+        .app-sidebar .nav-link.active {
+            background: rgba(175, 23, 99, .22);
+            border: 1px solid rgba(175, 23, 99, .35);
+            color: #fff !important;
+        }
+
+/* ---------- 6) INPUTS / SELECTS / LABELS ---------- */
+.form-control,
+.form-select,
+.input-group-text {
+    background: var(--app-surface-2);
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+}
+
+    .form-control::placeholder {
+        color: rgba(154,164,178,.75);
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: rgba(175, 23, 99, .55);
+        box-shadow: 0 0 0 .2rem rgba(175, 23, 99, .18);
+        color: var(--app-text);
+        background: var(--app-surface-2);
+    }
+
+    /* readonly */
+    .form-control[readonly] {
+        background: rgba(255,255,255,.06) !important;
+        color: var(--app-text) !important;
+        cursor: default;
+        caret-color: transparent;
+    }
+
+        .form-control[readonly]:focus {
+            outline: none;
+            box-shadow: none;
+        }
+
+    /* disabled (melhor aparência no tema) */
+    .form-control:disabled,
+    .form-select:disabled {
+        background: rgba(255,255,255,.06) !important;
+        color: var(--app-text) !important;
+        opacity: 1 !important;
+    }
+
+/* labels padrão */
+.app-label {
+    color: var(--app-muted);
+    font-size: .85rem;
+    margin-bottom: .35rem;
+}
+
+/* obrigatório */
+.app-label-required::after {
+    content: " *";
+    color: var(--app-danger);
+    font-weight: 700;
+}
+
+/* ---------- 7) TABELAS ---------- */
+.table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--app-text);
+    --bs-table-border-color: var(--app-border);
+}
+
+    .table thead th {
+        color: var(--app-muted);
+        font-weight: 600;
+        border-bottom: 1px solid var(--app-border);
+    }
+
+    .table tbody tr:hover {
+        background: rgba(255,255,255,.03);
+    }
+
+/* versão “soft dark” */
+.table-dark-soft {
+    --bs-table-bg: transparent;
+    --bs-table-striped-bg: rgba(255,255,255,.03);
+    --bs-table-hover-bg: rgba(255,255,255,.05);
+    --bs-table-color: var(--app-text);
+    --bs-table-border-color: var(--app-border);
+}
+
+/* cabeçalho da tabela (dashboard/patrimônios) */
+.app-table-head {
+    color: var(--app-muted);
+    font-size: .8rem;
+    letter-spacing: .06em;
+}
+
+/* ---------- 8) BOTÕES ---------- */
+/* btn-primary sem “azul do bootstrap” */
+.btn-primary {
+    background-color: var(--app-primary) !important;
+    border-color: var(--app-primary) !important;
+    color: #fff !important;
+}
+
+    .btn-primary:hover,
+    .btn-primary:active,
+    .btn-primary.active,
+    .btn-check:checked + .btn-primary {
+        background-color: var(--app-primary) !important;
+        border-color: var(--app-primary) !important;
+        color: #fff !important;
+        filter: brightness(1.06);
+    }
+
+/* focus ring do tema (global) */
+.btn:focus,
+.btn:focus-visible,
+.btn-check:focus + .btn {
+    box-shadow: 0 0 0 .2rem rgba(175, 23, 99, .18) !important;
+    outline: none !important;
+}
+
+.btn-outline-secondary {
+    border-color: rgba(255,255,255,.18);
+    color: var(--app-text);
+}
+
+    .btn-outline-secondary:hover {
+        background: rgba(255,255,255,.08);
+        border-color: rgba(255,255,255,.24);
+        color: var(--app-text);
+    }
+
+/* badge soft neutro */
+.badge-soft {
+    border: 1px solid var(--app-border);
+    background: rgba(255,255,255,.06);
+    color: var(--app-text);
+}
+
+/* Botão ícone definitivo (apenas o ícone) */
+.app-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+    .app-icon-btn i {
+        color: var(--app-primary);
+        transition: transform .12s ease, filter .12s ease;
+    }
+
+    .app-icon-btn:hover i {
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+    }
+
+    .app-icon-btn:active i {
+        transform: translateY(0);
+    }
+
+/* ---------- 8.1) PAGINAÇÃO (padrão do sistema / igual ao botão Filtrar) ---------- */
+.pagination .page-link {
+    background: var(--app-surface-2);
+    border: 1px solid var(--app-border);
+    color: var(--app-text);
+}
+
+    .pagination .page-link:hover {
+        background: rgba(175, 23, 99, .18);
+        border-color: rgba(175, 23, 99, .35);
+        color: #fff;
+    }
+
+.pagination .page-item.active .page-link {
+    background-color: var(--app-primary);
+    border-color: var(--app-primary);
+    color: #fff;
+}
+
+.pagination .page-item.disabled .page-link {
+    background: rgba(255,255,255,.04);
+    border-color: var(--app-border);
+    color: var(--app-muted);
+    opacity: .65;
+}
+
+.pagination .page-link:focus {
+    box-shadow: 0 0 0 .2rem rgba(175, 23, 99, .18);
+    outline: none;
+}
+
+/* ---------- 9) OFFCANVAS (MOBILE) ---------- */
+.offcanvas {
+    background: var(--app-surface) !important;
+    color: var(--app-text) !important;
+    border-color: var(--app-border) !important;
+    z-index: 1055;
+}
+
+.offcanvas-backdrop {
+    z-index: 1050;
+}
+
+/* ---------- 10) SCROLL DARK (OPCIONAL) ---------- */
+*::-webkit-scrollbar {
+    height: 10px;
+    width: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.12);
+    border-radius: 999px;
+}
+
+*::-webkit-scrollbar-track {
+    background: rgba(255,255,255,.04);
+}
+
+/* ---------- 11) DASHBOARD HELPERS ---------- */
+.app-kpi-title {
+    color: var(--app-muted);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: .75rem;
+}
+
+/* KPI badges (TOTAL/OK/OFF/MAN) */
+.app-badge-kpi {
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: .75rem;
+    border: 1px solid var(--app-border);
+}
+
+.app-badge-kpi-total {
+    background: rgba(13,110,253,.18);
+    border-color: rgba(13,110,253,.35);
+    color: #fff;
+}
+
+.app-badge-kpi-ok {
+    background: rgba(25,135,84,.18);
+    border-color: rgba(25,135,84,.35);
+    color: #fff;
+}
+
+.app-badge-kpi-off {
+    background: rgba(171,46,60,.18);
+    border-color: rgba(171,46,60,.35);
+    color: #fff;
+}
+
+.app-badge-kpi-man {
+    background: rgba(255,193,7,.16);
+    border-color: rgba(255,193,7,.40);
+    color: #fff;
+}
+
+/* ---------- 12) STATUS BADGES (Views) ---------- */
+.badge-status,
+.app-badge-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: .45rem .75rem;
+    font-weight: 600;
+    font-size: .8rem;
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.06);
+    color: var(--app-text);
+}
+
+/* Ativo -> VERDE */
+.badge-status-ativo,
+.app-badge-status-ativo {
+    background: rgba(25,135,84,.18);
+    border-color: rgba(25,135,84,.35);
+    color: #fff;
+}
+
+/* Baixado -> VERMELHO */
+.badge-status-baixado,
+.app-badge-status-baixado {
+    background: rgba(171,46,60,.18);
+    border-color: rgba(171,46,60,.35);
+    color: #fff;
+}
+
+/* Emprestado -> NOVA cor (ROXO) */
+.badge-status-emprestado,
+.app-badge-status-emprestado {
+    background: rgba(124,58,237,.18);
+    border-color: rgba(124,58,237,.38);
+    color: #fff;
+}
+
+/* Aguardando Manutenção -> AZUL */
+.badge-status-aguardando,
+.app-badge-status-aguardando {
+    background: rgba(13,110,253,.18);
+    border-color: rgba(13,110,253,.35);
+    color: #fff;
+}
+
+/* Em manutenção -> AMARELO */
+.badge-status-em-manutencao,
+.app-badge-status-manutencao {
+    background: rgba(255,193,7,.18);
+    border-color: rgba(255,193,7,.40);
+    color: #fff;
+}
+
+/* (extra) caso você use as variáveis em algum lugar no futuro */
+.app-badge-status-ativo {
+    background: color-mix(in srgb, var(--pc-status-ativo) 18%, transparent);
+}
+
+.app-badge-status-aguardando {
+    background: color-mix(in srgb, var(--pc-status-aguardando) 18%, transparent);
+}
+
+.app-badge-status-baixado {
+    background: color-mix(in srgb, var(--pc-status-baixado) 18%, transparent);
+}
+
+.app-badge-status-manutencao {
+    background: color-mix(in srgb, var(--pc-status-manutencao) 18%, transparent);
+}
+
+.app-badge-status-emprestado {
+    background: color-mix(in srgb, var(--pc-status-emprestado) 18%, transparent);
+}
+
+/* ---------- 13) TRÂMITES (Detalhes) ---------- */
+.app-tramites-scroll {
+    max-height: 260px;
+    overflow-y: auto;
+    padding-right: .25rem;
+}
+
+.app-tramite-item {
+    font-size: .9rem;
+    padding: .45rem 0;
+    border-bottom: 1px solid var(--app-border);
+}
+
+    .app-tramite-item:last-child {
+        border-bottom: none;
+    }
+
+.app-tramite-header {
+    display: flex;
+    justify-content: space-between;
+    gap: .75rem;
+    font-weight: 600;
+    color: var(--app-text);
+}
+
+.app-tramite-campo {
+    margin-top: .25rem;
+    color: var(--app-muted);
+    font-size: .85rem;
+}
+
+/* ---------- 14) AUTH / LOGIN ---------- */
+.app-auth {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.app-auth-card {
+    width: 100%;
+    max-width: 420px;
+}
+
+.app-alert {
+    border-radius: var(--app-radius-sm);
+    border: 1px solid var(--app-border);
+}
+
+/* ---------- 15) MANUTENÇÕES (Board / Kanban) ---------- */
+.app-board-col {
+    min-height: 180px;
+}
+
+.app-board-empty {
+    padding: .35rem 0;
+}
+
+.app-board-item {
+    background: var(--app-surface-2);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius);
+    padding: .75rem;
+    margin-top: .75rem;
+}
+
+/* ---------- 16) BADGES (Manutenções) ---------- */
+.app-badge-state {
+    border: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.06);
+    color: #fff;
+}
+
+.app-badge-state-ok {
+    background: rgba(25,135,84,.18);
+    border-color: rgba(25,135,84,.35);
+}
+
+.app-badge-state-off {
+    background: rgba(171,46,60,.18);
+    border-color: rgba(171,46,60,.35);
+}
+
+.app-badge-state-warn {
+    background: rgba(255,193,7,.16);
+    border-color: rgba(255,193,7,.40);
+    color: #fff;
+}
+
+/* ---------- 17) COMBOBOX (pesquisa + lista) ---------- */
+.app-combobox {
+    position: relative;
+}
+
+.app-combobox-list {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: var(--app-radius-sm);
+    box-shadow: 0 16px 30px rgba(0,0,0,.25);
+    max-height: 240px;
+    overflow-y: auto;
+    z-index: 1080;
+    padding: .25rem;
+}
+
+.app-combobox-item {
+    padding: .55rem .6rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: .92rem;
+    color: var(--app-text);
+}
+
+    .app-combobox-item:hover {
+        background: rgba(255,255,255,.06);
+    }
+
+    .app-combobox-item small {
+        display: block;
+        margin-top: .1rem;
+        font-size: .82rem;
+        color: var(--app-muted);
+    }
+
+/* ---------- 18) BOTÕES (estado OK / Finalizada) ---------- */
+.app-btn-ok {
+    background: rgba(25,135,84,.18) !important;
+    border: 1px solid rgba(25,135,84,.35) !important;
+    color: #fff !important;
+    transition: filter .12s ease, box-shadow .12s ease, transform .12s ease;
+}
+
+    .app-btn-ok:hover {
+        filter: brightness(1.25);
+        box-shadow: 0 0 0 .2rem rgba(25,135,84,.22);
+        transform: translateY(-1px);
+    }
+
+    .app-btn-ok:active,
+    .app-btn-ok.active {
+        filter: brightness(1.12);
+        transform: translateY(0);
+        box-shadow: none;
+    }
+
+/* ---------- 19) UNIDADES (Divisórias / Listas) ---------- */
+.app-divider {
+    border: 0;
+    border-top: 1px solid var(--app-border);
+    margin: 1rem 0;
+}
+
+.app-list-clean {
+    list-style: none;
+    padding-left: 0;
+}
+
+.app-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .5rem 0;
+    border-bottom: 1px solid var(--app-border);
+}
+
+    .app-list-row:last-child {
+        border-bottom: none;
+    }
+
+/* ---------- 20) TOAST (Notificações Globais) ---------- */
+.toast-container {
+    max-width: 560px;
+    width: calc(100% - 24px);
+}
+
+/* ---------- 21) FIX LAYOUT: só o MAIN rola (Topo + Sidebar fixos) ---------- */
+@media (min-width: 992px) {
+    html,
+    body {
+        height: 100%;
+        overflow: hidden; /* trava o scroll do BODY */
+    }
+
+    /* trava o wrapper geral (Corona template / seu layout) */
+    .container-scroller,
+    .page-body-wrapper {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    /* Sidebar não rola junto com a página */
+    .sidebar,
+    .app-sidebar {
+        height: calc(100vh - 70px);
+        overflow: hidden; /* se quiser permitir rolagem interna do menu, troque por auto */
+    }
+
+    /* Só o conteúdo rola */
+    .main-panel,
+    main,
+    .app-main,
+    .content-wrapper {
+        height: calc(100vh - 70px);
+    }
+
+    .main-panel,
+    main,
+    .app-main {
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+}

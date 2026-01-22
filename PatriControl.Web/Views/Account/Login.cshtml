@@ -1,0 +1,73 @@
+﻿@model PatriControl.Web.Models.LoginViewModel
+
+@{
+    ViewData["Title"] = "Login - PatriControl";
+}
+
+<div class="app-auth">
+    <div class="app-card app-auth-card p-4 p-md-5">
+        <div class="text-center mb-4">
+            <div class="app-auth-brand">
+                <div class="app-logo mx-auto mb-2">P</div>
+                <h2 class="h4 mb-1 text-white">PatriControl</h2>
+                <div class="app-muted">Acesse sua conta para continuar</div>
+            </div>
+        </div>
+
+        @* Mensagem do middleware (?inativo=1) *@
+        @if (ViewBag.MensagemInativo != null)
+        {
+            <div class="alert alert-warning app-alert" role="alert">
+                @ViewBag.MensagemInativo
+            </div>
+        }
+
+        @* Erro geral (ModelOnly) *@
+        @if (!ViewData.ModelState.IsValid && ViewData.ModelState.ContainsKey(string.Empty))
+        {
+            <div class="alert alert-danger app-alert" role="alert">
+                @foreach (var err in ViewData.ModelState[string.Empty]!.Errors)
+                {
+                    <div>@err.ErrorMessage</div>
+                }
+            </div>
+        }
+
+        <form asp-action="Login" method="post" novalidate>
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+
+            <div class="mb-3">
+                <label asp-for="Email" class="form-label app-label"></label>
+                <input asp-for="Email"
+                       class="form-control"
+                       placeholder="Digite seu e-mail"
+                       autocomplete="username" />
+                <span asp-validation-for="Email" class="text-danger small"></span>
+            </div>
+
+            <div class="mb-3">
+                <label asp-for="Senha" class="form-label app-label"></label>
+                <input asp-for="Senha"
+                       type="password"
+                       class="form-control"
+                       placeholder="Digite sua senha"
+                       autocomplete="current-password" />
+                <span asp-validation-for="Senha" class="text-danger small"></span>
+            </div>
+
+            <div class="form-check mb-3">
+                <input asp-for="LembrarMe" class="form-check-input" />
+                <label asp-for="LembrarMe" class="form-check-label app-muted">Lembrar-me</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 py-2">
+                Entrar
+            </button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

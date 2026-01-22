@@ -1,0 +1,20 @@
+/* Tema leve: deixa tudo com cara moderna sem “brigar” com o Bootstrap */
+:root {
+    --pc-radius: 14px;
+}
+
+.card, .modal-content, .form-control, .form-select, .btn {
+    border-radius: var(--pc-radius);
+}
+
+    /* Readonly com cara de readonly (Bootstrap puro não deixa tão evidente) */
+    .form-control[readonly],
+    .form-select[disabled] {
+        background-color: var(--bs-tertiary-bg);
+        color: var(--bs-body-color);
+        cursor: default;
+    }
+
+    .form-control[readonly] {
+        caret-color: transparent;
+    }

@@ -1,0 +1,66 @@
+﻿@using System.Globalization
+@model PatriControl.Web.Models.PaginacaoViewModel
+
+@{
+    if (Model.TotalPages <= 1) { return; }
+
+    var page = Model.Page < 1 ? 1 : Model.Page;
+    var totalPages = Model.TotalPages < 1 ? 1 : Model.TotalPages;
+    if (page > totalPages) page = totalPages;
+
+    int start = Math.Max(1, page - 2);
+    int end = Math.Min(totalPages, start + 4);
+    start = Math.Max(1, end - 4);
+
+    Dictionary<string, string> RV(int p)
+    {
+        var d = new Dictionary<string, string>();
+
+        var baseRv = Model.RouteValues ?? new Dictionary<string, object?>();
+        foreach (var kv in baseRv)
+        {
+            if (kv.Value == null) continue;
+            d[kv.Key] = Convert.ToString(kv.Value, CultureInfo.InvariantCulture) ?? "";
+        }
+
+        d["page"] = p.ToString(CultureInfo.InvariantCulture);
+        d["pageSize"] = Model.PageSize.ToString(CultureInfo.InvariantCulture);
+        return d;
+    }
+}
+
+<nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-end mb-0">
+
+        <li class="page-item @(page <= 1 ? "disabled" : "")">
+            <a class="page-link"
+               asp-action="@Model.Action"
+               asp-controller="@Model.Controller"
+               asp-all-route-data="@(RV(page - 1))">
+                Anterior
+            </a>
+        </li>
+
+        @for (int i = start; i <= end; i++)
+        {
+            <li class="page-item @(i == page ? "active" : "")">
+                <a class="page-link"
+                   asp-action="@Model.Action"
+                   asp-controller="@Model.Controller"
+                   asp-all-route-data="@(RV(i))">
+                    @i
+                </a>
+            </li>
+        }
+
+        <li class="page-item @(page >= totalPages ? "disabled" : "")">
+            <a class="page-link"
+               asp-action="@Model.Action"
+               asp-controller="@Model.Controller"
+               asp-all-route-data="@(RV(page + 1))">
+                Próxima
+            </a>
+        </li>
+
+    </ul>
+</nav>

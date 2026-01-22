@@ -1,0 +1,590 @@
+﻿@model PatriControl.Web.Models.ViewModels.DashboardViewModel
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = "Dashboard";
+
+    var jsonOpts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+
+    var unidades = (ViewBag.Unidades as IEnumerable<string>) ?? Enumerable.Empty<string>();
+    var tipos = (ViewBag.Tipos as IEnumerable<string>) ?? Enumerable.Empty<string>();
+    var fornecedores = (ViewBag.Fornecedores as IEnumerable<string>) ?? Enumerable.Empty<string>();
+
+    var statusLista = (IEnumerable<string>)ViewBag.StatusLista;
+    var condicaoLista = (IEnumerable<string>)ViewBag.CondicaoLista;
+
+    var unidadesJs = JsonSerializer.Serialize(unidades.Select(x => new { nome = x }), jsonOpts);
+    var tiposJs = JsonSerializer.Serialize(tipos.Select(x => new { nome = x }), jsonOpts);
+    var fornecedoresJs = JsonSerializer.Serialize(fornecedores.Select(x => new { nome = x }), jsonOpts);
+
+    var statusChart = JsonSerializer.Serialize(Model.StatusPatrimonios, jsonOpts);
+    var topUnidadesChart = JsonSerializer.Serialize(Model.TopUnidades, jsonOpts);
+    var topTiposChart = JsonSerializer.Serialize(Model.TopTipos, jsonOpts);
+    var manutMesChart = JsonSerializer.Serialize(Model.ManutencoesPorMes, jsonOpts);
+    var custoMesChart = JsonSerializer.Serialize(Model.CustoPorMes, jsonOpts);
+
+    string money(decimal v) => v.ToString("C", new System.Globalization.CultureInfo("pt-BR"));
+}
+
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-3">
+    <div>
+        <h4 class="mb-1 text-white">Dashboard</h4>
+        <div class="app-muted">Análise de patrimônios e manutenções</div>
+    </div>
+</div>
+
+<!-- FILTROS -->
+<form method="get" class="app-card p-3 mb-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div class="text-white fw-semibold">Filtros</div>
+        <div class="app-muted small">
+            Período: <b class="text-white">@Model.DataInicio.ToString("dd/MM/yyyy")</b> até <b class="text-white">@Model.DataFim.ToString("dd/MM/yyyy")</b>
+        </div>
+    </div>
+
+    <div class="row g-2 g-md-3">
+        <div class="col-12 col-md-3">
+            <label class="form-label app-label">Data início</label>
+            <input type="date" name="de" class="form-control" value="@Model.DataInicio.ToString("yyyy-MM-dd")" />
+        </div>
+
+        <div class="col-12 col-md-3">
+            <label class="form-label app-label">Data fim</label>
+            <input type="date" name="ate" class="form-control" value="@Model.DataFim.ToString("yyyy-MM-dd")" />
+        </div>
+
+        <div class="col-12 col-md-6">
+            <label class="form-label app-label">Unidade</label>
+            <div class="app-combobox">
+                <input type="hidden" id="f-unidade" name="unidade" value="@(Model.Unidade ?? "")" />
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-building"></i></span>
+                    <input type="text"
+                           id="f-unidade-texto"
+                           class="form-control"
+                           placeholder="Digite para buscar..."
+                           autocomplete="off"
+                           value="@(Model.Unidade ?? "")"
+                           oninput="filtrarUnidadesDash()" />
+                </div>
+                <div id="f-unidade-opcoes" class="app-combobox-list" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label app-label">Tipo</label>
+            <div class="app-combobox">
+                <input type="hidden" id="f-tipo" name="tipo" value="@(Model.Tipo ?? "")" />
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-grid"></i></span>
+                    <input type="text"
+                           id="f-tipo-texto"
+                           class="form-control"
+                           placeholder="Digite para buscar..."
+                           autocomplete="off"
+                           value="@(Model.Tipo ?? "")"
+                           oninput="filtrarTiposDash()" />
+                </div>
+                <div id="f-tipo-opcoes" class="app-combobox-list" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-4">
+            <label class="form-label app-label">Fornecedor</label>
+            <div class="app-combobox">
+                <input type="hidden" id="f-fornecedor" name="fornecedor" value="@(Model.Fornecedor ?? "")" />
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-truck"></i></span>
+                    <input type="text"
+                           id="f-fornecedor-texto"
+                           class="form-control"
+                           placeholder="Digite para buscar..."
+                           autocomplete="off"
+                           value="@(Model.Fornecedor ?? "")"
+                           oninput="filtrarFornecedoresDash()" />
+                </div>
+                <div id="f-fornecedor-opcoes" class="app-combobox-list" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-2">
+            <label class="form-label app-label">Status</label>
+            <select class="form-select" name="status">
+                @foreach (var s in statusLista)
+                {
+                    <option value="@s" selected="@(s == (Model.Status ?? "") ? "selected" : null)">
+                        @(string.IsNullOrWhiteSpace(s) ? "(Todos)" : s)
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 col-md-2">
+            <label class="form-label app-label">Condição</label>
+            <select class="form-select" name="condicao">
+                @foreach (var c in condicaoLista)
+                {
+                    <option value="@c" selected="@(c == (Model.Condicao ?? "") ? "selected" : null)">
+                        @(string.IsNullOrWhiteSpace(c) ? "(Todas)" : c)
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div class="col-12 col-md-4 d-flex align-items-end gap-2">
+            <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+            <a class="btn btn-outline-secondary w-100" href="@Url.Action("Index", "Dashboard")">Limpar</a>
+        </div>
+    </div>
+</form>
+
+<!-- KPIs (Patrimônios) -->
+<div class="row g-3 mb-3">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="app-kpi-title">Total de patrimônios</div>
+                    <div class="fs-3 fw-bold mt-1">@Model.TotalPatrimonios</div>
+                    <div class="app-muted small mt-1">Conforme filtros.</div>
+                </div>
+                <span class="badge app-badge-kpi app-badge-kpi-total rounded-pill">TOTAL</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="app-kpi-title">Ativos</div>
+                    <div class="fs-3 fw-bold mt-1">@Model.TotalAtivos</div>
+                    <div class="app-muted small mt-1">Status: Ativo.</div>
+                </div>
+                <span class="badge app-badge-kpi app-badge-kpi-ok rounded-pill">OK</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="app-kpi-title">Em manutenção</div>
+                    <div class="fs-3 fw-bold mt-1">@Model.TotalEmManutencao</div>
+                    <div class="app-muted small mt-1">Status: Em manutenção.</div>
+                </div>
+                <span class="badge app-badge-kpi app-badge-kpi-man rounded-pill">MAN</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="app-kpi-title">Baixados / inativos</div>
+                    <div class="fs-3 fw-bold mt-1">@Model.TotalBaixados</div>
+                    <div class="app-muted small mt-1">Status: Baixado.</div>
+                </div>
+                <span class="badge app-badge-kpi app-badge-kpi-off rounded-pill">OFF</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPIs (Manutenções no período) -->
+<div class="row g-3 mb-3">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="app-kpi-title">Manutenções abertas (período)</div>
+            <div class="fs-3 fw-bold mt-1">@Model.ManutencoesAbertasPeriodo</div>
+            <div class="app-muted small mt-1">Em andamento / não canceladas.</div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="app-kpi-title">Finalizadas (período)</div>
+            <div class="fs-3 fw-bold mt-1">@Model.ManutencoesFinalizadasPeriodo</div>
+            <div class="app-muted small mt-1">Status: Finalizada.</div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="app-kpi-title">Custo final total (período)</div>
+            <div class="fs-3 fw-bold mt-1">@money(Model.CustoFinalTotalPeriodo)</div>
+            <div class="app-muted small mt-1">Somente finalizadas.</div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="app-kpi-title">Ticket médio (finalizadas)</div>
+            <div class="fs-3 fw-bold mt-1">@money(Model.TicketMedioFinalizadasPeriodo)</div>
+            <div class="app-muted small mt-1">Média do custo final.</div>
+        </div>
+    </div>
+</div>
+
+<!-- GRÁFICOS -->
+<div class="row g-3 mb-3">
+    <div class="col-12 col-xl-6">
+        <div class="app-card p-3 h-100">
+            <div class="text-white fw-semibold mb-2">Patrimônios por status</div>
+            <div class="app-muted small mb-2">Distribuição conforme filtros.</div>
+            <div style="height:320px;">
+                <canvas id="chartStatus"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="app-card p-3 h-100">
+            <div class="text-white fw-semibold mb-2">Top 10 unidades</div>
+            <div class="app-muted small mb-2">Quantidade de patrimônios por unidade.</div>
+            <div style="height:320px;">
+                <canvas id="chartUnidades"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12 col-xl-6">
+        <div class="app-card p-3 h-100">
+            <div class="text-white fw-semibold mb-2">Top 10 tipos de patrimônio</div>
+            <div class="app-muted small mb-2">Quantidade por tipo.</div>
+            <div style="height:320px;">
+                <canvas id="chartTipos"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="app-card p-3 h-100">
+            <div class="text-white fw-semibold mb-2">Manutenções abertas por mês</div>
+            <div class="app-muted small mb-2">Volume de aberturas no período.</div>
+            <div style="height:320px;">
+                <canvas id="chartManutMes"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-12">
+        <div class="app-card p-3">
+            <div class="text-white fw-semibold mb-2">Custo final por mês (finalizadas)</div>
+            <div class="app-muted small mb-2">Soma do custo final no período.</div>
+            <div style="height:320px;">
+                <canvas id="chartCustoMes"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- TABELAS -->
+<div class="row g-3">
+    <div class="col-12 col-xl-6">
+        <div class="app-card p-3 h-100">
+            <div class="text-white fw-semibold mb-1">Patrimônios recentes</div>
+            <div class="app-muted small mb-2">Últimos registros criados (conforme filtros).</div>
+
+            <div class="table-responsive">
+                <table class="table table-dark-soft table-hover align-middle mb-0">
+                    <thead>
+                        <tr class="app-table-head">
+                            <th style="width:160px;">NÚMERO</th>
+                            <th>DESCRIÇÃO</th>
+                            <th style="width:240px;">UNIDADE</th>
+                            <th style="width:190px;">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.Recentes == null || !Model.Recentes.Any())
+                        {
+                            <tr><td colspan="4" class="app-muted">Nenhum patrimônio encontrado.</td></tr>
+                        }
+                        else
+                        {
+                            foreach (var p in Model.Recentes)
+                            {
+                                var num = string.IsNullOrWhiteSpace(p.Numero) ? "-" : p.Numero;
+                                <tr>
+                                    <td class="fw-semibold text-white">@num</td>
+                                    <td class="text-white">@p.Descricao</td>
+                                    <td class="app-muted">@p.Unidade</td>
+                                    <td class="app-muted">@p.Status</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="app-card p-3 h-100">
+            <div class="text-white fw-semibold mb-1">Manutenções recentes</div>
+            <div class="app-muted small mb-2">Últimas aberturas registradas.</div>
+
+            <div class="table-responsive">
+                <table class="table table-dark-soft table-hover align-middle mb-0">
+                    <thead>
+                        <tr class="app-table-head">
+                            <th style="width:140px;">CÓDIGO</th>
+                            <th>PATRIMÔNIO</th>
+                            <th style="width:140px;">STATUS</th>
+                            <th style="width:160px;">ABERTA EM</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model.ManutencoesRecentes == null || !Model.ManutencoesRecentes.Any())
+                        {
+                            <tr><td colspan="4" class="app-muted">Nenhuma manutenção encontrada.</td></tr>
+                        }
+                        else
+                        {
+                            foreach (var m in Model.ManutencoesRecentes)
+                            {
+                                var pat = $"{m.PatrimonioNumero ?? ""} - {m.PatrimonioDescricao ?? ""}".Trim();
+                                <tr>
+                                    <td class="fw-semibold text-white">@m.Codigo</td>
+                                    <td class="text-white">@pat</td>
+                                    <td class="app-muted">@m.Status</td>
+                                    <td class="app-muted">@m.AbertaEm.ToString("dd/MM/yyyy HH:mm")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <!-- Chart.js (CDN). Se preferir, você pode baixar e servir localmente -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+    <script>
+        const dsUnidades = @Html.Raw(unidadesJs);
+        const dsTipos = @Html.Raw(tiposJs);
+        const dsFornecedores = @Html.Raw(fornecedoresJs);
+
+        const chartStatusData = @Html.Raw(statusChart);
+        const chartUnidadesData = @Html.Raw(topUnidadesChart);
+        const chartTiposData = @Html.Raw(topTiposChart);
+        const chartManutMesData = @Html.Raw(manutMesChart);
+        const chartCustoMesData = @Html.Raw(custoMesChart);
+
+        function escapeHtml(str) {
+            return String(str)
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function hideIfClickOutside(inputId, listId) {
+            document.addEventListener('click', function (e) {
+                const input = document.getElementById(inputId);
+                const box = document.getElementById(listId);
+                if (!input || !box) return;
+                if (!box.contains(e.target) && e.target !== input) box.style.display = 'none';
+            });
+        }
+
+        function setupCombobox({ inputId, hiddenId, listId, dataset }) {
+            hideIfClickOutside(inputId, listId);
+
+            window[inputId + "_filter"] = function () {
+                const input = document.getElementById(inputId);
+                const hid = document.getElementById(hiddenId);
+                const box = document.getElementById(listId);
+                if (!input || !hid || !box) return;
+
+                const q = (input.value || '').toLowerCase().trim();
+                hid.value = ""; // reset até selecionar
+
+                if (!q) { box.style.display = 'none'; return; }
+
+                const itens = dataset
+                    .filter(x => (x.nome || '').toLowerCase().includes(q))
+                    .slice(0, 25);
+
+                if (!itens.length) {
+                    box.innerHTML = `<div class="app-combobox-item app-muted" style="cursor:default;">Nenhum encontrado.</div>`;
+                    box.style.display = 'block';
+                    return;
+                }
+
+                box.innerHTML = itens.map(x => `
+                    <div class="app-combobox-item"
+                         onclick="selectComboboxValue('${inputId}','${hiddenId}','${listId}','${escapeHtml(x.nome)}')">
+                        ${escapeHtml(x.nome)}
+                    </div>
+                `).join('');
+
+                box.style.display = 'block';
+            };
+        }
+
+        function selectComboboxValue(inputId, hiddenId, listId, value) {
+            const input = document.getElementById(inputId);
+            const hid = document.getElementById(hiddenId);
+            const box = document.getElementById(listId);
+
+            if (input) input.value = value;
+            if (hid) hid.value = value;
+            if (box) box.style.display = 'none';
+        }
+
+        function filtrarUnidadesDash() { window["f-unidade-texto_filter"](); }
+        function filtrarTiposDash() { window["f-tipo-texto_filter"](); }
+        function filtrarFornecedoresDash() { window["f-fornecedor-texto_filter"](); }
+
+        setupCombobox({ inputId: "f-unidade-texto", hiddenId: "f-unidade", listId: "f-unidade-opcoes", dataset: dsUnidades });
+        setupCombobox({ inputId: "f-tipo-texto", hiddenId: "f-tipo", listId: "f-tipo-opcoes", dataset: dsTipos });
+        setupCombobox({ inputId: "f-fornecedor-texto", hiddenId: "f-fornecedor", listId: "f-fornecedor-opcoes", dataset: dsFornecedores });
+
+        function cssVar(name) {
+            return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+        }
+
+        function ensureData(d) {
+            return d && d.labels && d.values && d.labels.length;
+        }
+
+        function statusColor(label) {
+            const k = (label || '').trim().toLowerCase();
+
+            if (k === 'ativo') return cssVar('--pc-status-ativo') || cssVar('--app-success');
+            if (k === 'aguardando manutenção' || k === 'aguardando manutencao') return cssVar('--pc-status-aguardando') || cssVar('--app-blue');
+            if (k === 'baixado') return cssVar('--pc-status-baixado') || cssVar('--app-danger');
+            if (k === 'em manutenção' || k === 'em manutencao') return cssVar('--pc-status-manutencao') || cssVar('--app-warning');
+            if (k === 'emprestado') return cssVar('--pc-status-emprestado') || cssVar('--app-info');
+
+            // fallback
+            return cssVar('--app-primary') || '#999';
+        } // ✅ <-- FECHAMENTO QUE ESTAVA FALTANDO
+
+        function buildDoughnut(canvasId, d) {
+            const el = document.getElementById(canvasId);
+            if (!el || !ensureData(d) || typeof Chart === "undefined") return;
+
+            new Chart(el, {
+                type: 'doughnut',
+                data: {
+                    labels: d.labels,
+                    datasets: [{
+                        data: d.values,
+                        backgroundColor: d.labels.map(l => statusColor(l))
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#E7EAF1' } }
+                    }
+                }
+            });
+        }
+
+        function buildBar(canvasId, d) {
+            const el = document.getElementById(canvasId);
+            if (!el || !ensureData(d) || typeof Chart === "undefined") return;
+
+            const one = (d.labels?.length || 0) === 1;
+
+            new Chart(el, {
+                type: 'bar',
+                data: {
+                    labels: d.labels,
+                    datasets: [{
+                        label: '',
+                        data: d.values,
+
+                        //  controla largura da barra
+                        maxBarThickness: one ? 140 : 56,
+                        categoryPercentage: one ? 0.22 : 0.72,
+                        barPercentage: one ? 0.55 : 0.85,
+
+                        backgroundColor: cssVar('--app-primary') || '#AF1763'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: {
+                            offset: true, //  ajuda a não “colar” nas bordas quando tem pouco item
+                            ticks: { color: '#E7EAF1' },
+                            grid: { color: 'rgba(255,255,255,.06)' }
+                        },
+                        y: {
+                            ticks: { color: '#E7EAF1' },
+                            grid: { color: 'rgba(255,255,255,.06)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function buildLine(canvasId, d) {
+            const el = document.getElementById(canvasId);
+            if (!el || !ensureData(d) || typeof Chart === "undefined") return;
+
+            new Chart(el, {
+                type: 'line',
+                data: {
+                    labels: d.labels,
+                    datasets: [{
+                        label: 'Abertas',
+                        data: d.values,
+                        borderColor: cssVar('--app-primary') || '#AF1763',
+                        backgroundColor: 'rgba(175,23,99,.15)',
+                        fill: true,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#E7EAF1' } } },
+                    scales: {
+                        x: { ticks: { color: '#E7EAF1' }, grid: { color: 'rgba(255,255,255,.06)' } },
+                        y: { ticks: { color: '#E7EAF1' }, grid: { color: 'rgba(255,255,255,.06)' } }
+                    }
+                }
+            });
+        }
+
+        function normalizeChartData(d) {
+            if (!d) return { labels: [], values: [] };
+            const labels = d.labels ?? d.Labels ?? [];
+            const values = d.values ?? d.Values ?? [];
+            return { labels, values };
+        }
+
+        window.addEventListener('load', () => {
+            const s  = normalizeChartData(chartStatusData);
+            const u  = normalizeChartData(chartUnidadesData);
+            const t  = normalizeChartData(chartTiposData);
+            const mm = normalizeChartData(chartManutMesData);
+            const cm = normalizeChartData(chartCustoMesData);
+
+            buildDoughnut('chartStatus', s);
+            buildBar('chartUnidades', u);
+            buildBar('chartTipos', t);
+            buildLine('chartManutMes', mm);
+            buildBar('chartCustoMes', cm);
+        });
+    </script>
+}
