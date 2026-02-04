@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -31,7 +32,7 @@ builder.Services.AddDbContext<PatriControlContext>(options =>
 builder.Services
     .AddIdentity<Usuario, IdentityRole<int>>(options =>
     {
-        // Senha (ajuste se quiser mais rígido)
+        // Senha
         options.Password.RequiredLength = 8;
         options.Password.RequireDigit = true;
         options.Password.RequireLowercase = true;
@@ -49,7 +50,30 @@ builder.Services
     .AddEntityFrameworkStores<PatriControlContext>()
     .AddDefaultTokenProviders();
 
+// =====================
+// (Opcional, mas recomendado) Redirecionamento HTTPS com porta fixa
+// =====================
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.HttpsPort = 443;
+});
+
+// =====================
+// Forwarded Headers (recomendado em IIS/proxy)
+// =====================
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+    // Em rede interna, para não bloquear por "KnownNetworks/Proxies"
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
+// =====================
 // Cookie do Identity
+// =====================
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.LoginPath = "/Account/Login";
@@ -103,7 +127,6 @@ builder.Services.AddScoped<IUserClaimsPrincipalFactory<Usuario>, PatriControlCla
 // =====================
 builder.Services.AddScoped<Microsoft.AspNetCore.Identity.IdentityErrorDescriber, PatriControl.Web.Services.PtBrIdentityErrorDescriber>();
 
-
 // =====================
 // Audit Logger
 // =====================
@@ -142,6 +165,9 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// IMPORTANTÍSSIMO: antes do UseHttpsRedirection
+app.UseForwardedHeaders();
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
@@ -158,7 +184,7 @@ app.Use(async (ctx, next) =>
 app.UseRouting();
 
 app.UseAuthentication();                       // Identity cookie
-app.UseMiddleware<UsuarioAtivoMiddleware>();   // vamos ajustar ele já já (pra Identity)
+app.UseMiddleware<UsuarioAtivoMiddleware>();   // você pode manter (ajustar depois se quiser)
 app.UseAuthorization();
 
 app.MapControllerRoute(
