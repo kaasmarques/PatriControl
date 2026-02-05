@@ -1,11 +1,11 @@
 /* ===========================================
-   app.css ó Tema DARK (Corona-like) definitivo
+   app.css  Tema DARK (Corona-like) definitivo
    Primary:  #AF1763
    BG:       #191C24
    Support:  #0D6EFD  #198754  #0DCAF0  #AB2E3C  #FFC107
    =========================================== */
 
-/* ---------- 1) TOKENS / VARS (⁄NICO) ---------- */
+/* ---------- 1) TOKENS / VARS (NICO) ---------- */
 :root,
 [data-bs-theme="dark"] {
     --app-bg: #191C24;
@@ -21,11 +21,11 @@
     --app-danger: #AB2E3C;
     --app-warning: #FFC107;
     /* ===============================
-       STATUS COLORS (PadronizaÁ„o)
+       STATUS COLORS (Padronizao)
        Ativo                 -> verde (antes: aguardando)
-       Aguardando ManutenÁ„o -> azul  (antes: baixado)
+       Aguardando Manuteno -> azul  (antes: baixado)
        Baixado               -> vermelho (antes: ativo)
-       Em manutenÁ„o          -> amarelo (antes: emprestado)
+       Em manuteno          -> amarelo (antes: emprestado)
        Emprestado            -> NOVA cor (roxo)
        =============================== */
     --pc-status-ativo: var(--app-success);
@@ -77,7 +77,7 @@ body,
     backdrop-filter: blur(10px);
 }
 
-/* logo (o ìPî) */
+/* logo (o P) */
 .app-logo {
     width: 38px;
     height: 38px;
@@ -90,7 +90,7 @@ body,
     color: #fff;
 }
 
-/* superfÌcie usada no layout (chip do usu·rio) */
+/* superfcie usada no layout (chip do usurio) */
 .app-surface {
     background: var(--app-surface) !important;
     border: 1px solid var(--app-border) !important;
@@ -103,7 +103,7 @@ body,
     color: #fff;
 }
 
-/* ---------- 4) SUPERFÕCIES / CARDS / DROPDOWNS / MODAL ---------- */
+/* ---------- 4) SUPERFCIES / CARDS / DROPDOWNS / MODAL ---------- */
 .card,
 .modal-content,
 .dropdown-menu,
@@ -192,7 +192,7 @@ body,
             box-shadow: none;
         }
 
-    /* disabled (melhor aparÍncia no tema) */
+    /* disabled (melhor aparncia no tema) */
     .form-control:disabled,
     .form-select:disabled {
         background: rgba(255,255,255,.06) !important;
@@ -200,14 +200,14 @@ body,
         opacity: 1 !important;
     }
 
-/* labels padr„o */
+/* labels padro */
 .app-label {
     color: var(--app-muted);
     font-size: .85rem;
     margin-bottom: .35rem;
 }
 
-/* obrigatÛrio */
+/* obrigatrio */
 .app-label-required::after {
     content: " *";
     color: var(--app-danger);
@@ -231,7 +231,7 @@ body,
         background: rgba(255,255,255,.03);
     }
 
-/* vers„o ìsoft darkî */
+/* verso soft dark */
 .table-dark-soft {
     --bs-table-bg: transparent;
     --bs-table-striped-bg: rgba(255,255,255,.03);
@@ -240,15 +240,14 @@ body,
     --bs-table-border-color: var(--app-border);
 }
 
-/* cabeÁalho da tabela (dashboard/patrimÙnios) */
+/* cabealho da tabela (dashboard/patrimnios) */
 .app-table-head {
     color: var(--app-muted);
     font-size: .8rem;
     letter-spacing: .06em;
 }
 
-/* ---------- 8) BOT’ES ---------- */
-/* btn-primary sem ìazul do bootstrapî */
+/* ---------- 8) BOTES ---------- */
 .btn-primary {
     background-color: var(--app-primary) !important;
     border-color: var(--app-primary) !important;
@@ -291,7 +290,7 @@ body,
     color: var(--app-text);
 }
 
-/* Bot„o Ìcone definitivo (apenas o Ìcone) */
+/* Boto cone definitivo (apenas o cone) */
 .app-icon-btn {
     display: inline-flex;
     align-items: center;
@@ -316,7 +315,7 @@ body,
         transform: translateY(0);
     }
 
-/* ---------- 8.1) PAGINA«√O (padr„o do sistema / igual ao bot„o Filtrar) ---------- */
+/* ---------- 8.1) PAGINAO ---------- */
 .pagination .page-link {
     background: var(--app-surface-2);
     border: 1px solid var(--app-border);
@@ -382,7 +381,7 @@ body,
     font-size: .75rem;
 }
 
-/* KPI badges (TOTAL/OK/OFF/MAN) */
+/* KPI badges */
 .app-badge-kpi {
     padding: .35rem .65rem;
     border-radius: 999px;
@@ -415,7 +414,7 @@ body,
     color: #fff;
 }
 
-/* ---------- 12) STATUS BADGES (Views) ---------- */
+/* ---------- 12) STATUS BADGES ---------- */
 .badge-status,
 .app-badge-status {
     display: inline-flex;
@@ -430,7 +429,6 @@ body,
     color: var(--app-text);
 }
 
-/* Ativo -> VERDE */
 .badge-status-ativo,
 .app-badge-status-ativo {
     background: rgba(25,135,84,.18);
@@ -438,7 +436,6 @@ body,
     color: #fff;
 }
 
-/* Baixado -> VERMELHO */
 .badge-status-baixado,
 .app-badge-status-baixado {
     background: rgba(171,46,60,.18);
@@ -446,7 +443,6 @@ body,
     color: #fff;
 }
 
-/* Emprestado -> NOVA cor (ROXO) */
 .badge-status-emprestado,
 .app-badge-status-emprestado {
     background: rgba(124,58,237,.18);
@@ -454,7 +450,6 @@ body,
     color: #fff;
 }
 
-/* Aguardando ManutenÁ„o -> AZUL */
 .badge-status-aguardando,
 .app-badge-status-aguardando {
     background: rgba(13,110,253,.18);
@@ -462,36 +457,14 @@ body,
     color: #fff;
 }
 
-/* Em manutenÁ„o -> AMARELO */
 .badge-status-em-manutencao,
-.app-badge-status-manutencao {
+.badge-status-manutencao {
     background: rgba(255,193,7,.18);
     border-color: rgba(255,193,7,.40);
     color: #fff;
 }
 
-/* (extra) caso vocÍ use as vari·veis em algum lugar no futuro */
-.app-badge-status-ativo {
-    background: color-mix(in srgb, var(--pc-status-ativo) 18%, transparent);
-}
-
-.app-badge-status-aguardando {
-    background: color-mix(in srgb, var(--pc-status-aguardando) 18%, transparent);
-}
-
-.app-badge-status-baixado {
-    background: color-mix(in srgb, var(--pc-status-baixado) 18%, transparent);
-}
-
-.app-badge-status-manutencao {
-    background: color-mix(in srgb, var(--pc-status-manutencao) 18%, transparent);
-}
-
-.app-badge-status-emprestado {
-    background: color-mix(in srgb, var(--pc-status-emprestado) 18%, transparent);
-}
-
-/* ---------- 13) TR¬MITES (Detalhes) ---------- */
+/* ---------- 13) TRMITES (Detalhes) ---------- */
 .app-tramites-scroll {
     max-height: 260px;
     overflow-y: auto;
@@ -541,7 +514,7 @@ body,
     border: 1px solid var(--app-border);
 }
 
-/* ---------- 15) MANUTEN«’ES (Board / Kanban) ---------- */
+/* ---------- 15) MANUTENES (Board / Kanban) ---------- */
 .app-board-col {
     min-height: 180px;
 }
@@ -558,7 +531,7 @@ body,
     margin-top: .75rem;
 }
 
-/* ---------- 16) BADGES (ManutenÁıes) ---------- */
+/* ---------- 16) BADGES (Manutenes) ---------- */
 .app-badge-state {
     border: 1px solid rgba(255,255,255,.10);
     background: rgba(255,255,255,.06);
@@ -620,7 +593,7 @@ body,
         color: var(--app-muted);
     }
 
-/* ---------- 18) BOT’ES (estado OK / Finalizada) ---------- */
+/* ---------- 18) BOTES (estado OK / Finalizada) ---------- */
 .app-btn-ok {
     background: rgba(25,135,84,.18) !important;
     border: 1px solid rgba(25,135,84,.35) !important;
@@ -641,7 +614,7 @@ body,
         box-shadow: none;
     }
 
-/* ---------- 19) UNIDADES (DivisÛrias / Listas) ---------- */
+/* ---------- 19) UNIDADES (Divisrias / Listas) ---------- */
 .app-divider {
     border: 0;
     border-top: 1px solid var(--app-border);
@@ -666,13 +639,13 @@ body,
         border-bottom: none;
     }
 
-/* ---------- 20) TOAST (NotificaÁıes Globais) ---------- */
+/* ---------- 20) TOAST ---------- */
 .toast-container {
     max-width: 560px;
     width: calc(100% - 24px);
 }
 
-/* ---------- 21) FIX LAYOUT: sÛ o MAIN rola (Topo + Sidebar fixos) ---------- */
+/* ---------- 21) FIX LAYOUT: s o MAIN rola (Topo + Sidebar fixos) ---------- */
 @media (min-width: 992px) {
     html,
     body {
@@ -680,21 +653,18 @@ body,
         overflow: hidden; /* trava o scroll do BODY */
     }
 
-    /* trava o wrapper geral (Corona template / seu layout) */
     .container-scroller,
     .page-body-wrapper {
         height: 100%;
         overflow: hidden;
     }
 
-    /* Sidebar n„o rola junto com a p·gina */
     .sidebar,
     .app-sidebar {
         height: calc(100vh - 70px);
-        overflow: hidden; /* se quiser permitir rolagem interna do menu, troque por auto */
+        overflow: hidden;
     }
 
-    /* SÛ o conte˙do rola */
     .main-panel,
     main,
     .app-main,
@@ -707,5 +677,73 @@ body,
     .app-main {
         overflow-y: auto;
         overflow-x: hidden;
+    }
+}
+
+/* ===========================
+   FIX: Modal + Layout com main-panel scroll
+   Quando abrir modal, trava o painel do sistema
+=========================== */
+body.modal-open .main-panel,
+body.modal-open .page-body-wrapper,
+body.modal-open .container-scroller {
+    overflow: hidden !important;
+}
+
+/* =========================================
+   FIX DEFINITIVO: MODAIS DE PATRIM√îNIO COM <form>
+   - resolve "Editar" e "Criar" travados no mobile
+   - mant√©m bot√µes acess√≠veis (footer fixo)
+   - scroll acontece SOMENTE no .modal-body (como o modal "Ver")
+   ========================================= */
+
+/* Ajuste de margem para n√£o encostar nas bordas em telas baixas */
+#modal-editar-patrimonio .modal-dialog,
+#modal-criar-patrimonio .modal-dialog {
+    margin: .5rem auto;
+}
+
+/* Limita altura ao viewport (vh + dvh para mobile moderno) */
+#modal-editar-patrimonio .modal-content,
+#modal-criar-patrimonio .modal-content {
+    max-height: calc(100vh - 1rem);
+    max-height: calc(100dvh - 1rem);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* quem rola √© o BODY */
+}
+
+    /* O Bootstrap "quebra" o scroll quando header/body/footer est√£o dentro de <form>.
+   Ent√£o o <form> vira o container flex que controla o layout interno. */
+    #modal-editar-patrimonio .modal-content > form,
+    #modal-criar-patrimonio .modal-content > form {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 auto;
+        min-height: 0; /* essencial p/ overflow funcionar dentro de flex */
+    }
+
+/* √Årea rol√°vel */
+#modal-editar-patrimonio .modal-body,
+#modal-criar-patrimonio .modal-body {
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0; /* essencial */
+}
+
+/* Header/Footer sempre vis√≠veis */
+#modal-editar-patrimonio .modal-header,
+#modal-editar-patrimonio .modal-footer,
+#modal-criar-patrimonio .modal-header,
+#modal-criar-patrimonio .modal-footer {
+    flex-shrink: 0;
+}
+
+/* Em telas MUITO baixas, d√° mais √°rea √∫til */
+@media (max-height: 820px) {
+    #modal-editar-patrimonio .modal-content,
+    #modal-criar-patrimonio .modal-content {
+        max-height: calc(100vh - .5rem);
+        max-height: calc(100dvh - .5rem);
     }
 }

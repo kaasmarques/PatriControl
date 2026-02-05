@@ -569,7 +569,7 @@ internal class Program
 /*
 COMANDO PRONTO (abrindo o terminal na pasta do projeto PatriControl.Tools):
 
-dotnet run -- "C:\Users\User\Desktop\Patrimonios.xlsx" --db "..\PatriControl.Web\patricontrol.db"
+dotnet run -- "C:\Users\User\Desktop\Patrimonios.xlsx" --db "..\PatriControl.Web\patricontrol.dev.db"
 
 (opcional) especificar aba:
 dotnet run -- "C:\Users\User\Desktop\Patrimonios.xlsx" --sheet "Planilha1" --db "..\PatriControl.Web\patricontrol.db"

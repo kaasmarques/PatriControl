@@ -1,0 +1,54 @@
+/* ============================================================
+   PatriControl - Modal scroll fix
+
+   Contexto:
+   - O layout do PatriControl usa um "main" com rolagem própria em
+     telas desktop (body overflow hidden + main overflow auto).
+   - Em algumas resoluções (ex.: 1360x768) modais grandes (modal-lg)
+     podem ultrapassar a altura visível e o scroll do Bootstrap pode
+     não "engatar" como esperado.
+
+   Objetivo:
+   - Forçar o modal a respeitar a altura da janela e permitir que o
+     conteúdo role dentro do .modal-body, mantendo o footer acessível.
+   ============================================================ */
+
+/* Garante que o container do modal possa rolar quando necessário */
+.modal {
+  overflow-y: auto !important;
+}
+
+/* Força o padrão scrollável a realmente limitar altura e rolar o body */
+.modal-dialog-scrollable {
+  /* Em alguns layouts o height do Bootstrap não resolve; usamos max-height */
+  height: auto !important;
+  max-height: calc(100vh - 1rem) !important;
+}
+
+.modal-dialog-scrollable .modal-content {
+  max-height: calc(100vh - 1rem) !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-dialog-scrollable .modal-body {
+  /* Deixa o body crescer e rolar */
+  flex: 1 1 auto;
+  overflow-y: auto !important;
+}
+
+.modal-dialog-scrollable .modal-footer {
+  /* Mantém os botões sempre visíveis */
+  flex: 0 0 auto;
+}
+
+/* Em telas mais baixas, reduz margens pra ganhar área útil */
+@media (max-height: 820px) {
+  .modal-dialog {
+    margin: .5rem auto !important;
+  }
+  .modal-dialog-scrollable,
+  .modal-dialog-scrollable .modal-content {
+    max-height: calc(100vh - 0.5rem) !important;
+  }
+}
