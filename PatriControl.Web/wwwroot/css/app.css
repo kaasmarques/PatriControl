@@ -90,6 +90,13 @@ body,
     color: #fff;
 }
 
+
+.app-logo-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
 /* superfcie usada no layout (chip do usurio) */
 .app-surface {
     background: var(--app-surface) !important;

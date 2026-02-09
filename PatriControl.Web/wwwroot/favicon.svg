@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <defs>
+    <!-- Fundo igual ao seu app-logo -->
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#AF1763"></stop>
+      <stop offset="100%" stop-color="#6d1bff"></stop>
+    </linearGradient>
+
+    <!-- Barcode mais denso (muitas barras finas) -->
+    <pattern id="barcode" patternUnits="userSpaceOnUse" width="22" height="64">
+      <rect x="0" y="0" width="1" height="64" fill="#fff"></rect>
+      <rect x="2" y="0" width="1" height="64" fill="#fff"></rect>
+      <rect x="4" y="0" width="2" height="64" fill="#fff"></rect>
+      <rect x="7" y="0" width="1" height="64" fill="#fff"></rect>
+      <rect x="9" y="0" width="3" height="64" fill="#fff"></rect>
+      <rect x="13" y="0" width="1" height="64" fill="#fff"></rect>
+      <rect x="15" y="0" width="2" height="64" fill="#fff"></rect>
+      <rect x="18" y="0" width="1" height="64" fill="#fff"></rect>
+      <rect x="20" y="0" width="2" height="64" fill="#fff"></rect>
+    </pattern>
+
+    <!-- Recorte no formato da letra P (maior) -->
+    <clipPath id="clipP">
+      <text x="32" y="48" text-anchor="middle" font-size="46" font-weight="900" font-family="Segoe UI, Arial, sans-serif">
+        P
+      </text>
+    </clipPath>
+  </defs>
+
+  <!-- Fundo arredondado -->
+  <rect x="0" y="0" width="64" height="64" rx="14" fill="url(#g)"></rect>
+
+  <!-- Preenche o "P" com as barras -->
+  <g clip-path="url(#clipP)" shape-rendering="crispEdges">
+    <rect x="0" y="0" width="64" height="64" fill="url(#barcode)"></rect>
+  </g>
+</svg>

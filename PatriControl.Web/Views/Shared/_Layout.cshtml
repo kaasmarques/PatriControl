@@ -4,6 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <title>@ViewData["Title"] - PatriControl</title>
+    <link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Bootstrap -->
@@ -66,7 +67,9 @@
 
                 <a class="navbar-brand d-flex align-items-center gap-2 m-0"
                    asp-controller="Dashboard" asp-action="Index">
-                    <div class="app-logo">P</div>
+                    <div class="app-logo mx-auto me-2">
+                        <img src="~/images/logo-barcode.svg" class="app-logo-img" alt="PatriControl" />
+                    </div>
                     <div class="lh-sm">
                         <div class="fw-semibold">PatriControl</div>
                         <div class="text-secondary small">Gestão de Patrimônio</div>
