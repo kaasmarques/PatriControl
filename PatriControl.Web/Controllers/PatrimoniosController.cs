@@ -619,6 +619,53 @@ namespace PatriControl.Web.Controllers
         }
 
         // =========================================================
+        // TRÂMITE PERSONALIZADO (AJAX)
+        // =========================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult AdicionarTramitePersonalizado(int patrimonioId, string texto)
+        {
+            var uid = GetUserId();
+
+            texto = (texto ?? "").Trim();
+            if (patrimonioId <= 0)
+                return Json(new { ok = false, message = "Patrimônio inválido." });
+
+            if (string.IsNullOrWhiteSpace(texto))
+                return Json(new { ok = false, message = "Informe o trâmite." });
+
+            var existe = _context.Patrimonios.AsNoTracking().Any(p => p.Id == patrimonioId);
+            if (!existe)
+            {
+                TryAudit(uid, "Tentou adicionar trâmite personalizado (falhou)", "Patrimonio", patrimonioId, "Patrimônio não encontrado.");
+                return Json(new { ok = false, message = "Patrimônio não encontrado." });
+            }
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            int.TryParse(userIdStr, out var usuarioId);
+
+            var nomeUsuario = User.Identity?.Name ?? "Desconhecido";
+            var agora = DateTime.Now;
+
+            _context.Tramites.Add(new Tramite
+            {
+                PatrimonioId = patrimonioId,
+                UsuarioId = usuarioId,
+                NomeUsuario = nomeUsuario,
+                Tipo = "PERSONALIZADO",
+                Campo = "Trâmite personalizado",
+                ValorNovo = texto,
+                DataHora = agora
+            });
+
+            _context.SaveChanges();
+
+            TryAudit(uid, "Adicionou trâmite personalizado", "Patrimonio", patrimonioId, $"Texto='{texto}'");
+
+            return Json(new { ok = true });
+        }
+
+        // =========================================================
         // TRÂMITES (AJAX)
         // =========================================================
         [HttpGet]

@@ -463,7 +463,16 @@
                 </div>
 
                 <div class="mt-4">
-                    <div class="text-white fw-semibold mb-1">Trâmites do Patrimônio</div>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <div class="text-white fw-semibold">Trâmites do Patrimônio</div>
+                        <button type="button"
+                                class="app-icon-btn"
+                                aria-label="Adicionar trâmite"
+                                title="Adicionar trâmite"
+                                onclick="abrirTramitePersonalizado()">
+                            <i class="bi bi-plus-square-fill" style="font-size:28px;"></i>
+                        </button>
+                    </div>
                     <div id="det-tramites" class="app-tramites-scroll">
                         <div class="app-muted">Carregando histórico...</div>
                     </div>
@@ -783,6 +792,35 @@
     </div>
 </div>
 
+<!-- =================================================
+   MODAL: TRÂMITE PERSONALIZADO
+   ================================================= -->
+<div class="modal fade" id="modal-tramite-personalizado" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Novo trâmite personalizado</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="form-tramite-personalizado">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="tp-patrimonio-id" name="patrimonioId" />
+
+                <div class="modal-body">
+                    <label class="form-label app-label app-label-required">Trâmite</label>
+                    <textarea class="form-control" id="tp-texto" name="texto" rows="4" required></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         const unidades = @Html.Raw(unidadesJs);
@@ -809,6 +847,12 @@
             const el = document.getElementById(id);
             const m = bootstrap.Modal.getOrCreateInstance(el, { backdrop: true });
             m.show();
+        }
+
+        function hideModal(id) {
+            const el = document.getElementById(id);
+            const m = bootstrap.Modal.getOrCreateInstance(el);
+            m.hide();
         }
 
         function hideBox(boxId) {
@@ -1391,7 +1435,20 @@
 
                         const usuarioLabel = codigo ? `${codigo} | ${nome}` : nome;
 
-                        if (tipo === "CRIACAO") {
+                        if (tipo === "PERSONALIZADO") {
+                            const texto = t.valorNovo || t.valorAntigo || "";
+                            html += `
+                                <div class="app-tramite-item">
+                                    <div class="app-tramite-header">
+                                        <span>${usuarioLabel} escreveu</span>
+                                        <span class="app-muted">${data}</span>
+                                    </div>
+                                    <div class="app-tramite-campo">
+                                        ${escapeHtml(texto)}
+                                    </div>
+                                </div>
+                            `;
+                        } else if (tipo === "CRIACAO") {
                             html += `
                                 <div class="app-tramite-item">
                                     <div class="app-tramite-header">
@@ -1430,6 +1487,9 @@
             const json = botao.getAttribute('data-patrimonio') || '{}';
             let p = {};
             try { p = JSON.parse(json); } catch { }
+
+            //  define o patrimônio atual para o trâmite personalizado
+            patrimonioAtualId = p.id || 0;
 
             document.getElementById('det-numero').value          = p.numero || '';
             document.getElementById('det-descricao').value       = p.descricao || '';
@@ -1536,6 +1596,100 @@
             document.getElementById('create-fornecedor-busca').value = "";
 
             showModal('modal-criar-patrimonio');
+        }
+
+        // =========================================================
+        // Trâmites personalizados
+        // =========================================================
+        let patrimonioAtualId = 0;
+
+        function abrirTramitePersonalizado() {
+            if (!patrimonioAtualId) {
+                showToast("Patrimônio inválido.", "danger");
+                return;
+            }
+
+            document.getElementById('tp-patrimonio-id').value = patrimonioAtualId;
+            document.getElementById('tp-texto').value = "";
+            showModal('modal-tramite-personalizado');
+
+            setTimeout(() => document.getElementById('tp-texto')?.focus(), 150);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const formTramite = document.getElementById('form-tramite-personalizado');
+            if (formTramite) {
+                formTramite.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const texto = (document.getElementById('tp-texto').value || "").trim();
+                    if (!texto) {
+                        showToast("Informe o trâmite.", "danger");
+                        return;
+                    }
+
+                    const token = getAntiForgeryToken('form-tramite-personalizado');
+                    const body = new URLSearchParams();
+                    body.append("__RequestVerificationToken", token);
+                    body.append("patrimonioId", String(patrimonioAtualId));
+                    body.append("texto", texto);
+
+                    fetch('/Patrimonios/AdicionarTramitePersonalizado', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: body.toString()
+                    })
+                        .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao salvar." })
+                        .then(res => {
+                            if (!res.ok) {
+                                showToast(res.message || "Erro ao salvar.", "danger");
+                                return;
+                            }
+
+                            hideModal('modal-tramite-personalizado');
+                            carregarTramites(patrimonioAtualId);
+                            showToast("Trâmite registrado com sucesso.", "success");
+                        })
+                        .catch(() => showToast("Erro ao salvar.", "danger"));
+                });
+            }
+        });
+
+        function getAntiForgeryToken(formId) {
+            const form = document.getElementById(formId);
+            const token = form?.querySelector('input[name="__RequestVerificationToken"]');
+            return token ? token.value : '';
+        }
+
+        function showToast(message, type = "success", delay) {
+            const container = document.querySelector(".toast-container");
+            if (!container) {
+                alert(message);
+                return;
+            }
+
+            const d = delay ?? (type === "danger" ? 4000 : 3000);
+
+            const toast = document.createElement("div");
+            toast.className = `toast align-items-center text-bg-${type} border-0 fade`;
+            toast.setAttribute("role", "alert");
+            toast.setAttribute("aria-live", "assertive");
+            toast.setAttribute("aria-atomic", "true");
+            toast.setAttribute("data-bs-delay", d.toString());
+
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${escapeHtml(message)}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+                </div>
+            `;
+
+            container.appendChild(toast);
+
+            const instance = bootstrap.Toast.getOrCreateInstance(toast, { delay: d });
+            instance.show();
+
+            toast.addEventListener("hidden.bs.toast", () => toast.remove());
         }
     </script>
 }
