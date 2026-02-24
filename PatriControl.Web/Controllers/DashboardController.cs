@@ -28,7 +28,7 @@ namespace PatriControl.Web.Controllers
             string? fornecedor,
             string? status,
             string? condicao,
-            int dias = 90 // default “BI”: últimos 90 dias
+            int dias = 90 // default "BI": últimos 90 dias
         )
         {
             // ===== Período default =====
@@ -79,22 +79,25 @@ namespace PatriControl.Web.Controllers
             if (!string.IsNullOrWhiteSpace(condicao))
                 qPat = qPat.Where(p => (p.Condicao ?? "") == condicao.Trim());
 
-            // ===== KPIs Patrimônios =====
-            var totalPatrimonios = qPat.Count();
-
-            int CountStatus(string st) =>
-                qPat.Count(p => (p.Status ?? "").ToLower() == st.ToLower());
-
-            var totalAtivos = CountStatus("Ativo");
-            var totalBaixados = CountStatus("Baixado");
-            var totalEmManut = CountStatus("Em manutenção");
-
-            // ===== Chart: Status Patrimônios (distribuição) =====
+            // ===== KPIs Patrimônios (UMA ÚNICA QUERY ao invés de 4) =====
+            // statusDist já traz a distribuição completa — reutilizar para KPIs e chart
             var statusDist = qPat
                 .GroupBy(p => (p.Status ?? "Sem status").Trim())
                 .Select(g => new { Status = g.Key, Qtde = g.Count() })
-                .OrderByDescending(x => x.Qtde)
                 .ToList();
+
+            var totalPatrimonios = statusDist.Sum(x => x.Qtde);
+
+            // Buscar KPIs direto do statusDist já materializado (zero queries extras)
+            int GetCount(string st) =>
+                statusDist.FirstOrDefault(x => string.Equals(x.Status, st, StringComparison.OrdinalIgnoreCase))?.Qtde ?? 0;
+
+            var totalAtivos = GetCount("Ativo");
+            var totalBaixados = GetCount("Baixado");
+            var totalEmManut = GetCount("Em manutenção");
+
+            // Ordenar para o chart
+            var statusDistOrdenado = statusDist.OrderByDescending(x => x.Qtde).ToList();
 
             // ===== Chart: Top Unidades =====
             var topUnidades = qPat
@@ -118,15 +121,10 @@ namespace PatriControl.Web.Controllers
                 .Take(10)
                 .ToList();
 
-            // ===== Query Manutenções (no período) =====
+            // ===== Query Manutenções (no período) - SEM Include para contagens =====
             var qMan = _context.Manutencoes
                 .AsNoTracking()
-                .Include(m => m.Patrimonio)
-                .Include(m => m.Manutentor)
-                .AsQueryable();
-
-            // período: por AbertaEm (visão de “volume de aberturas no período”)
-            qMan = qMan.Where(m => m.AbertaEm >= dataInicio && m.AbertaEm <= fimDoDia);
+                .Where(m => m.AbertaEm >= dataInicio && m.AbertaEm <= fimDoDia);
 
             // aplica filtros de patrimônio também nas manutenções
             if (!string.IsNullOrWhiteSpace(unidade))
@@ -138,12 +136,13 @@ namespace PatriControl.Web.Controllers
             if (!string.IsNullOrWhiteSpace(fornecedor))
                 qMan = qMan.Where(m => m.Patrimonio != null && (m.Patrimonio.Fornecedor ?? "") == fornecedor.Trim());
 
-            // ===== KPIs Manutenções no período =====
+            // ===== KPIs Manutenções (2 counts + Sum) =====
             var manutAbertasPeriodo = qMan.Count(m => m.Status != "Finalizada" && m.Status != "Cancelada");
             var manutFinalizadasPeriodo = qMan.Count(m => m.Status == "Finalizada");
 
+            // SQLite não suporta Sum em decimal — projetar só o campo e somar no C#
             var custoFinalTotalPeriodo = qMan
-                .Where(m => m.Status == "Finalizada")
+                .Where(m => m.Status == "Finalizada" && m.CustoFinal != null)
                 .Select(m => m.CustoFinal)
                 .ToList()
                 .Sum(v => v ?? 0m);
@@ -179,11 +178,9 @@ namespace PatriControl.Web.Controllers
                 .OrderBy(x => x.Year).ThenBy(x => x.Month)
                 .ToList();
 
-            // ===== Recentes (Manutenções) =====
+            // ===== Recentes (Manutenções) — projeção direta sem Include =====
             var manutRecentes = _context.Manutencoes
                 .AsNoTracking()
-                .Include(m => m.Patrimonio)
-                .Include(m => m.Manutentor)
                 .OrderByDescending(m => m.AbertaEm)
                 .Take(10)
                 .Select(m => new ManutencaoResumo
@@ -255,8 +252,8 @@ namespace PatriControl.Web.Controllers
             };
 
             // charts
-            vm.StatusPatrimonios.Labels = statusDist.Select(x => x.Status).ToList();
-            vm.StatusPatrimonios.Values = statusDist.Select(x => (decimal)x.Qtde).ToList();
+            vm.StatusPatrimonios.Labels = statusDistOrdenado.Select(x => x.Status).ToList();
+            vm.StatusPatrimonios.Values = statusDistOrdenado.Select(x => (decimal)x.Qtde).ToList();
 
             vm.TopUnidades.Labels = topUnidades.Select(x => x.Nome).ToList();
             vm.TopUnidades.Values = topUnidades.Select(x => (decimal)x.Qtde).ToList();

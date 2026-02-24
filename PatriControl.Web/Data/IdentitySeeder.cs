@@ -11,6 +11,42 @@ namespace PatriControl.Web.Data
 
         public static async Task SeedAsync(IServiceProvider services)
         {
+            // ─────────────────────────────────────────────────────
+            // FAST PATH: verificação leve via DbContext (1 query SQL)
+            // Se ROOT + Role Admin já existem e estão consistentes,
+            // pula TODAS as chamadas pesadas do Identity.
+            // ─────────────────────────────────────────────────────
+            using var fastScope = services.CreateScope();
+            var db = fastScope.ServiceProvider.GetRequiredService<PatriControlContext>();
+
+            var snapshot = await db.Users
+                .Where(u => u.Codigo == ROOT_CODIGO)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.Status,
+                    u.Administrador,
+                    TemRoleAdmin = db.UserRoles.Any(ur =>
+                        ur.UserId == u.Id &&
+                        db.Roles.Any(r => r.Id == ur.RoleId && r.Name == ROLE_ADMIN)),
+                    RoleAdminExiste = db.Roles.Any(r => r.Name == ROLE_ADMIN)
+                })
+                .FirstOrDefaultAsync();
+
+            // ROOT já existe, Status=Ativo, é Admin, e tem a Role vinculada → nada a fazer
+            if (snapshot is not null
+                && string.Equals(snapshot.Status, "Ativo", StringComparison.OrdinalIgnoreCase)
+                && snapshot.Administrador
+                && snapshot.TemRoleAdmin
+                && snapshot.RoleAdminExiste)
+            {
+                return; // ← fast path: 0 chamadas ao Identity
+            }
+
+            // ─────────────────────────────────────────────────────
+            // SLOW PATH: algo precisa ser criado ou corrigido
+            // Usa UserManager/RoleManager normalmente
+            // ─────────────────────────────────────────────────────
             using var scope = services.CreateScope();
 
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<Usuario>>();
@@ -31,8 +67,6 @@ namespace PatriControl.Web.Data
             // 3) Se não existe, cria
             if (root == null)
             {
-                // Observação: Identity precisa de UserName único.
-                // Como você NÃO quer depender de email, use um username fixo "usr001".
                 root = new Usuario
                 {
                     Codigo = ROOT_CODIGO,
@@ -57,7 +91,7 @@ namespace PatriControl.Web.Data
             }
             else
             {
-                // 4) Já existe: garante que ele está consistente (não cria de novo)
+                // 4) Já existe: garante que ele está consistente
                 var precisaUpdate = false;
 
                 if (!string.Equals(root.Status, "Ativo", StringComparison.OrdinalIgnoreCase))

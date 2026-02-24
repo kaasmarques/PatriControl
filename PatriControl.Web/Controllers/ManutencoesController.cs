@@ -21,11 +21,11 @@ namespace PatriControl.Web.Controllers
             _audit = audit;
         }
 
-        private void TryAudit(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
+        private async Task TryAuditAsync(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
         {
             try
             {
-                _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes).GetAwaiter().GetResult();
+                await _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes);
             }
             catch
             {
@@ -51,39 +51,38 @@ namespace PatriControl.Web.Controllers
                 .AsNoTracking()
                 .AsQueryable();
 
-            // Filtro por Patrimônio
+            // Filtro por Patrimônio — EF.Functions.Like para execução no SQL
             if (patrimonioId.HasValue && patrimonioId.Value > 0)
             {
                 queryBase = queryBase.Where(m => m.PatrimonioId == patrimonioId.Value);
             }
             else if (!string.IsNullOrWhiteSpace(patrimonio))
             {
-                var t = patrimonio.Trim().ToLowerInvariant();
+                var t = patrimonio.Trim();
                 queryBase = queryBase.Where(m =>
                     m.Patrimonio != null &&
                     (
-                        (m.Patrimonio.Numero ?? "").ToLower().Contains(t) ||
-                        (m.Patrimonio.Descricao ?? "").ToLower().Contains(t)
+                        EF.Functions.Like(m.Patrimonio.Numero ?? "", $"%{t}%") ||
+                        EF.Functions.Like(m.Patrimonio.Descricao ?? "", $"%{t}%")
                     )
                 );
             }
 
-            // Filtro por Usuário (quem abriu)
+            // Filtro por Usuário (quem abriu) — EF.Functions.Like para execução no SQL
             if (usuarioId.HasValue && usuarioId.Value > 0)
             {
                 queryBase = queryBase.Where(m => m.AbertaPorId == usuarioId.Value);
             }
             else if (!string.IsNullOrWhiteSpace(usuario))
             {
-                var t = usuario.Trim().ToLowerInvariant();
+                var t = usuario.Trim();
                 queryBase = queryBase.Where(m =>
                     m.AbertaPor != null &&
                     (
-                        (m.AbertaPor.Codigo ?? "").ToLower().Contains(t) ||
-                        (m.AbertaPor.Nome ?? "").ToLower().Contains(t) ||
-                        (m.AbertaPor.Sobrenome ?? "").ToLower().Contains(t) ||
-                        (m.AbertaPor.Email ?? "").ToLower().Contains(t) ||
-                        (((m.AbertaPor.Nome ?? "") + " " + (m.AbertaPor.Sobrenome ?? "")).ToLower().Contains(t))
+                        EF.Functions.Like(m.AbertaPor.Codigo ?? "", $"%{t}%") ||
+                        EF.Functions.Like(m.AbertaPor.Nome ?? "", $"%{t}%") ||
+                        EF.Functions.Like(m.AbertaPor.Sobrenome ?? "", $"%{t}%") ||
+                        EF.Functions.Like(m.AbertaPor.Email ?? "", $"%{t}%")
                     )
                 );
             }
@@ -140,16 +139,19 @@ namespace PatriControl.Web.Controllers
                 .Concat(canceladasList)
                 .ToList();
 
-            // ===== Dados para filtros/modais =====
+            // ===== Dados para filtros/modais — com AsNoTracking() =====
             ViewBag.Patrimonios = _context.Patrimonios
+                .AsNoTracking()
                 .OrderBy(p => p.Numero)
                 .ToList();
 
             ViewBag.Manutentores = _context.Manutentores
+                .AsNoTracking()
                 .OrderBy(x => x.Nome)
                 .ToList();
 
             ViewBag.Usuarios = _context.Usuarios
+                .AsNoTracking()
                 .OrderBy(u => u.Codigo)
                 .ToList();
 
@@ -206,7 +208,7 @@ namespace PatriControl.Web.Controllers
         // POST: /Manutencoes/Create
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(int patrimonioId, int tipoManutencaoId, int? manutentorId, decimal? custoEstimado)
+        public async Task<IActionResult> Create(int patrimonioId, int tipoManutencaoId, int? manutentorId, decimal? custoEstimado)
         {
             var patrimonio = _context.Patrimonios.FirstOrDefault(p => p.Id == patrimonioId);
             if (patrimonio == null)
@@ -283,7 +285,7 @@ namespace PatriControl.Web.Controllers
 
                 var patrimonioInfo = $"{(patrimonio.Numero ?? "")} - {(patrimonio.Descricao ?? "")}".Trim();
                 var detalhes = $"{codigo} | Patrimônio: {patrimonioInfo} | TipoManutencaoId={tipoManutencaoId} | ManutentorId={(manutentorId?.ToString() ?? "-")} | CustoEstimado={(custoEstimado?.ToString("0.##", CultureInfo.InvariantCulture) ?? "-")} | PatrimônioStatus: {statusAnterior} -> Em manutenção";
-                TryAudit(userId, "Abriu manutenção", "Manutencao", manut.Id, detalhes);
+                await TryAuditAsync(userId, "Abriu manutenção", "Manutencao", manut.Id, detalhes);
 
                 TempData["SuccessMessage"] = "Manutenção criada com sucesso.";
                 return RedirectToAction(nameof(Index));
@@ -299,7 +301,7 @@ namespace PatriControl.Web.Controllers
         // POST: /Manutencoes/Cancelar
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Cancelar(int id)
+        public async Task<IActionResult> Cancelar(int id)
         {
             var manut = _context.Manutencoes
                 .Include(m => m.Patrimonio)
@@ -359,7 +361,7 @@ namespace PatriControl.Web.Controllers
                 tx.Commit();
 
                 var detalhes = $"{manut.Codigo} | Status: {statusManutAnterior} -> Cancelada | Patrimônio: {patrimonioInfo} | PatrimônioStatus: {patrimonioStatusAnterior} -> Ativo";
-                TryAudit(userId, "Cancelou manutenção", "Manutencao", manut.Id, detalhes);
+                await TryAuditAsync(userId, "Cancelou manutenção", "Manutencao", manut.Id, detalhes);
 
                 TempData["SuccessMessage"] = "Manutenção cancelada e patrimônio liberado.";
                 return RedirectToAction(nameof(Index));
@@ -375,7 +377,7 @@ namespace PatriControl.Web.Controllers
         // POST: /Manutencoes/Finalizar
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Finalizar(int id, string? observacoesFinais, string? dataFinalizada, decimal? custoFinal, string statusFinalPatrimonio)
+        public async Task<IActionResult> Finalizar(int id, string? observacoesFinais, string? dataFinalizada, decimal? custoFinal, string statusFinalPatrimonio)
         {
             var manut = _context.Manutencoes
                 .Include(m => m.Patrimonio)
@@ -461,7 +463,7 @@ namespace PatriControl.Web.Controllers
                 tx.Commit();
 
                 var detalhes = $"{manut.Codigo} | Status: {statusManutAnterior} -> Finalizada | FinalizadaEm={finalizadaEm:dd/MM/yyyy HH:mm} | CustoFinal={(custoFinal?.ToString("0.##", CultureInfo.InvariantCulture) ?? "-")} | Patrimônio: {patrimonioInfo} | PatrimônioStatus: {patrimonioStatusAnterior} -> {statusFinalPatrimonio}";
-                TryAudit(userId, "Finalizou manutenção", "Manutencao", manut.Id, detalhes);
+                await TryAuditAsync(userId, "Finalizou manutenção", "Manutencao", manut.Id, detalhes);
 
                 TempData["SuccessMessage"] = "Manutenção finalizada e patrimônio liberado.";
                 return RedirectToAction(nameof(Index));

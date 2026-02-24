@@ -40,11 +40,11 @@ namespace PatriControl.Web.Controllers
             return null;
         }
 
-        private void TryAudit(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
+        private async Task TryAuditAsync(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
         {
             try
             {
-                _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes).GetAwaiter().GetResult();
+                await _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes);
             }
             catch
             {
@@ -189,7 +189,7 @@ namespace PatriControl.Web.Controllers
                 string.IsNullOrWhiteSpace(usuario.Email) ||
                 string.IsNullOrWhiteSpace(usuario.Senha))
             {
-                TryAudit(actorId, "Tentou criar usuário (falhou)", "Usuario", null, "Campos obrigatórios ausentes (Nome/Sobrenome/Email/Senha).");
+                await TryAuditAsync(actorId, "Tentou criar usuário (falhou)", "Usuario", null, "Campos obrigatórios ausentes (Nome/Sobrenome/Email/Senha).");
                 TempData["ErrorMessage"] = "Preencha Nome, Sobrenome, Email e Senha.";
                 return RedirectToAction(nameof(Index));
             }
@@ -200,7 +200,7 @@ namespace PatriControl.Web.Controllers
             usuario.Status = NormalizarStatus(usuario.Status);
             if (!_statusValidos.Contains(usuario.Status))
             {
-                TryAudit(actorId, "Tentou criar usuário (falhou)", "Usuario", null, $"Status inválido: '{usuario.Status}'.");
+                await TryAuditAsync(actorId, "Tentou criar usuário (falhou)", "Usuario", null, $"Status inválido: '{usuario.Status}'.");
                 TempData["ErrorMessage"] = "Status inválido. Use Ativo ou Inativo.";
                 return RedirectToAction(nameof(Index));
             }
@@ -209,7 +209,7 @@ namespace PatriControl.Web.Controllers
             var existenteEmail = await _userManager.FindByEmailAsync(usuario.Email);
             if (existenteEmail != null)
             {
-                TryAudit(actorId, "Tentou criar usuário (falhou)", "Usuario", null, $"E-mail duplicado: '{usuario.Email}'.");
+                await TryAuditAsync(actorId, "Tentou criar usuário (falhou)", "Usuario", null, $"E-mail duplicado: '{usuario.Email}'.");
                 TempData["ErrorMessage"] = "Já existe um usuário com este e-mail.";
                 return RedirectToAction(nameof(Index));
             }
@@ -241,7 +241,7 @@ namespace PatriControl.Web.Controllers
                 var erros = result.Errors.Select(e => e.Description).ToList();
                 var msg = string.Join(" | ", erros);
 
-                TryAudit(actorId, "Tentou criar usuário (falhou)", "Usuario", null, $"Erro Identity: {msg}");
+                await TryAuditAsync(actorId, "Tentou criar usuário (falhou)", "Usuario", null, $"Erro Identity: {msg}");
 
                 TempData["ErrorMessage"] = string.Join(" ", erros);
                 TempData["OpenModal"] = "novo-usuario";
@@ -253,7 +253,7 @@ namespace PatriControl.Web.Controllers
             if (novo.Administrador)
                 await _userManager.AddToRoleAsync(novo, ROLE_ADMIN);
 
-            TryAudit(
+            await TryAuditAsync(
                 actorId,
                 "Criou usuário",
                 "Usuario",
@@ -277,14 +277,14 @@ namespace PatriControl.Web.Controllers
             var existente = await _userManager.FindByIdAsync(usuario.Id.ToString());
             if (existente == null)
             {
-                TryAudit(actorId, "Tentou editar usuário (falhou)", "Usuario", usuario.Id, "Usuário não encontrado.");
+                await TryAuditAsync(actorId, "Tentou editar usuário (falhou)", "Usuario", usuario.Id, "Usuário não encontrado.");
                 return NotFound();
             }
 
             // ROOT
             if (string.Equals(existente.Codigo, "USR001", StringComparison.OrdinalIgnoreCase))
             {
-                TryAudit(actorId, "Tentou editar usuário ROOT (bloqueado)", "Usuario", existente.Id, "USR001 não pode ser editado.");
+                await TryAuditAsync(actorId, "Tentou editar usuário ROOT (bloqueado)", "Usuario", existente.Id, "USR001 não pode ser editado.");
                 TempData["ErrorMessage"] = "O usuário ROOT (USR001) não pode ser editado.";
                 return RedirectToAction(nameof(Index));
             }
@@ -293,7 +293,7 @@ namespace PatriControl.Web.Controllers
                 string.IsNullOrWhiteSpace(usuario.Sobrenome) ||
                 string.IsNullOrWhiteSpace(usuario.Email))
             {
-                TryAudit(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Codigo={existente.Codigo} | Campos obrigatórios ausentes (Nome/Sobrenome/Email).");
+                await TryAuditAsync(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Codigo={existente.Codigo} | Campos obrigatórios ausentes (Nome/Sobrenome/Email).");
                 TempData["ErrorMessage"] = "Preencha Nome, Sobrenome e Email.";
                 return RedirectToAction(nameof(Index));
             }
@@ -304,7 +304,7 @@ namespace PatriControl.Web.Controllers
             var outro = await _userManager.FindByEmailAsync(emailNormalizado);
             if (outro != null && outro.Id != existente.Id)
             {
-                TryAudit(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Codigo={existente.Codigo} | E-mail duplicado: '{emailNormalizado}'.");
+                await TryAuditAsync(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Codigo={existente.Codigo} | E-mail duplicado: '{emailNormalizado}'.");
                 TempData["ErrorMessage"] = "Já existe outro usuário com este e-mail.";
                 return RedirectToAction(nameof(Index));
             }
@@ -312,7 +312,7 @@ namespace PatriControl.Web.Controllers
             var statusNormalizado = NormalizarStatus(usuario.Status);
             if (!_statusValidos.Contains(statusNormalizado))
             {
-                TryAudit(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Codigo={existente.Codigo} | Status inválido: '{statusNormalizado}'.");
+                await TryAuditAsync(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Codigo={existente.Codigo} | Status inválido: '{statusNormalizado}'.");
                 TempData["ErrorMessage"] = "Status inválido. Use Ativo ou Inativo.";
                 return RedirectToAction(nameof(Index));
             }
@@ -339,7 +339,7 @@ namespace PatriControl.Web.Controllers
             if (!upd.Succeeded)
             {
                 var msg = string.Join(" | ", upd.Errors.Select(e => e.Description));
-                TryAudit(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Erro Identity: {msg}");
+                await TryAuditAsync(actorId, "Tentou editar usuário (falhou)", "Usuario", existente.Id, $"Erro Identity: {msg}");
                 TempData["ErrorMessage"] = "Erro ao atualizar usuário: " + msg;
                 return RedirectToAction(nameof(Index));
             }
@@ -353,7 +353,7 @@ namespace PatriControl.Web.Controllers
             if (!existente.Administrador && ehAdminNoRole)
                 await _userManager.RemoveFromRoleAsync(existente, ROLE_ADMIN);
 
-            TryAudit(
+            await TryAuditAsync(
                 actorId,
                 "Editou usuário",
                 "Usuario",
@@ -377,20 +377,20 @@ namespace PatriControl.Web.Controllers
             var usuario = await _userManager.FindByIdAsync(id.ToString());
             if (usuario == null)
             {
-                TryAudit(actorId, "Tentou alterar senha (falhou)", "Usuario", id, "Usuário não encontrado.");
+                await TryAuditAsync(actorId, "Tentou alterar senha (falhou)", "Usuario", id, "Usuário não encontrado.");
                 return NotFound();
             }
 
             if (string.Equals(usuario.Codigo, "USR001", StringComparison.OrdinalIgnoreCase))
             {
-                TryAudit(actorId, "Tentou alterar senha do ROOT (bloqueado)", "Usuario", usuario.Id, "USR001 não pode ter a senha alterada.");
+                await TryAuditAsync(actorId, "Tentou alterar senha do ROOT (bloqueado)", "Usuario", usuario.Id, "USR001 não pode ter a senha alterada.");
                 TempData["ErrorMessage"] = "A senha do ROOT (USR001) não pode ser alterada.";
                 return RedirectToAction(nameof(Index));
             }
 
             if (string.IsNullOrWhiteSpace(novaSenha))
             {
-                TryAudit(actorId, "Tentou alterar senha (falhou)", "Usuario", usuario.Id, $"Codigo={usuario.Codigo} | Nova senha vazia.");
+                await TryAuditAsync(actorId, "Tentou alterar senha (falhou)", "Usuario", usuario.Id, $"Codigo={usuario.Codigo} | Nova senha vazia.");
                 TempData["ErrorMessage"] = "Informe a nova senha.";
                 return RedirectToAction(nameof(Index));
             }
@@ -402,7 +402,7 @@ namespace PatriControl.Web.Controllers
             if (!res.Succeeded)
             {
                 var msg = string.Join(" | ", res.Errors.Select(e => e.Description));
-                TryAudit(actorId, "Tentou alterar senha (falhou)", "Usuario", usuario.Id, $"Codigo={usuario.Codigo} | Erro Identity: {msg}");
+                await TryAuditAsync(actorId, "Tentou alterar senha (falhou)", "Usuario", usuario.Id, $"Codigo={usuario.Codigo} | Erro Identity: {msg}");
                 TempData["ErrorMessage"] = "Erro ao alterar senha: " + msg;
                 return RedirectToAction(nameof(Index));
             }
@@ -410,7 +410,7 @@ namespace PatriControl.Web.Controllers
             usuario.AtualizadoEm = DateTime.Now;
             await _userManager.UpdateAsync(usuario);
 
-            TryAudit(actorId, "Alterou senha do usuário", "Usuario", usuario.Id, $"Codigo={usuario.Codigo} | Email='{usuario.Email}'");
+            await TryAuditAsync(actorId, "Alterou senha do usuário", "Usuario", usuario.Id, $"Codigo={usuario.Codigo} | Email='{usuario.Email}'");
             TempData["SuccessMessage"] = "Senha alterada com sucesso!";
 
             return RedirectToAction(nameof(Index));

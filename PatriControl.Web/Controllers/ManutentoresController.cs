@@ -37,11 +37,11 @@ namespace PatriControl.Web.Controllers
             return null;
         }
 
-        private void TryAudit(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
+        private async Task TryAuditAsync(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
         {
             try
             {
-                _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes).GetAwaiter().GetResult();
+                await _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes);
             }
             catch
             {
@@ -112,7 +112,7 @@ namespace PatriControl.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(string nome)
+        public async Task<IActionResult> Create(string nome)
         {
             if (!UsuarioEhAdmin())
                 return AcessoNegado();
@@ -123,7 +123,7 @@ namespace PatriControl.Web.Controllers
 
             if (string.IsNullOrWhiteSpace(nome))
             {
-                TryAudit(uid, "Tentou criar manutentor (falhou)", "Manutentor", null, "Nome vazio/nulo.");
+                await TryAuditAsync(uid, "Tentou criar manutentor (falhou)", "Manutentor", null, "Nome vazio/nulo.");
                 TempData["ErrorMessage"] = "Informe o nome do manutentor.";
                 return RedirectToAction(nameof(Index));
             }
@@ -132,7 +132,7 @@ namespace PatriControl.Web.Controllers
             var existe = _context.Manutentores.Any(x => x.Nome.ToLower() == nome.ToLower());
             if (existe)
             {
-                TryAudit(uid, "Tentou criar manutentor (falhou)", "Manutentor", null, $"Duplicado: {nome}");
+                await TryAuditAsync(uid, "Tentou criar manutentor (falhou)", "Manutentor", null, $"Duplicado: {nome}");
                 TempData["ErrorMessage"] = "Já existe um manutentor com esse nome.";
                 return RedirectToAction(nameof(Index));
             }
@@ -141,7 +141,7 @@ namespace PatriControl.Web.Controllers
             _context.Manutentores.Add(manutentor);
             _context.SaveChanges();
 
-            TryAudit(uid, "Criou manutentor", "Manutentor", manutentor.Id, $"Nome={nome}");
+            await TryAuditAsync(uid, "Criou manutentor", "Manutentor", manutentor.Id, $"Nome={nome}");
 
             TempData["SuccessMessage"] = "Manutentor criado com sucesso.";
             return RedirectToAction(nameof(Index));
@@ -149,7 +149,7 @@ namespace PatriControl.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit(int id, string nome)
+        public async Task<IActionResult> Edit(int id, string nome)
         {
             if (!UsuarioEhAdmin())
                 return AcessoNegado();
@@ -158,18 +158,18 @@ namespace PatriControl.Web.Controllers
 
             nome = (nome ?? "").Trim();
 
-            var existente = _context.Manutentores.FirstOrDefault(x => x.Id == id);
-            if (existente == null)
+            if (string.IsNullOrWhiteSpace(nome))
             {
-                TryAudit(uid, "Tentou editar manutentor (falhou)", "Manutentor", id, "Manutentor não encontrado.");
-                TempData["ErrorMessage"] = "Manutentor não encontrado.";
+                await TryAuditAsync(uid, "Tentou editar manutentor (falhou)", "Manutentor", id, "Nome vazio/nulo.");
+                TempData["ErrorMessage"] = "Informe o nome do manutentor.";
                 return RedirectToAction(nameof(Index));
             }
 
-            if (string.IsNullOrWhiteSpace(nome))
+            var existente = _context.Manutentores.FirstOrDefault(x => x.Id == id);
+            if (existente == null)
             {
-                TryAudit(uid, "Tentou editar manutentor (falhou)", "Manutentor", id, "Nome vazio/nulo.");
-                TempData["ErrorMessage"] = "Informe o nome do manutentor.";
+                await TryAuditAsync(uid, "Tentou editar manutentor (falhou)", "Manutentor", id, "Manutentor não encontrado.");
+                TempData["ErrorMessage"] = "Manutentor não encontrado.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -179,7 +179,7 @@ namespace PatriControl.Web.Controllers
 
             if (duplicado)
             {
-                TryAudit(uid, "Tentou editar manutentor (falhou)", "Manutentor", id, $"Duplicado: {nome}");
+                await TryAuditAsync(uid, "Tentou editar manutentor (falhou)", "Manutentor", id, $"Duplicado: {nome}");
                 TempData["ErrorMessage"] = "Já existe um outro manutentor com esse nome.";
                 return RedirectToAction(nameof(Index));
             }
@@ -188,7 +188,7 @@ namespace PatriControl.Web.Controllers
             existente.Nome = nome;
             _context.SaveChanges();
 
-            TryAudit(uid, "Editou manutentor", "Manutentor", id, $"Id={id} | Nome: {nomeAntigo} -> {nome}");
+            await TryAuditAsync(uid, "Editou manutentor", "Manutentor", id, $"Id={id} | Nome: {nomeAntigo} -> {nome}");
 
             TempData["SuccessMessage"] = "Manutentor atualizado com sucesso.";
             return RedirectToAction(nameof(Index));

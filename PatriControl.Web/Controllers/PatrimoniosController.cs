@@ -70,11 +70,11 @@ namespace PatriControl.Web.Controllers
             return null;
         }
 
-        private void TryAudit(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
+        private async Task TryAuditAsync(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
         {
             try
             {
-                _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes).GetAwaiter().GetResult();
+                await _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes);
             }
             catch
             {
@@ -140,28 +140,32 @@ namespace PatriControl.Web.Controllers
 
         private void CarregarDadosExportacao()
         {
-            // Names SEPARADOS para não sobrescrever os ViewBags usados pela view
-            // Unidades: usar as mesmas strings que ficam em Patrimonio.Unidade (ex: "9921 Sede")
-            ViewBag.ExportUnidades = _context.Patrimonios
+            // UMA ÚNICA QUERY: projetar só os 3 campos distintos necessários
+            var dados = _context.Patrimonios
                 .AsNoTracking()
+                .Select(p => new { p.Unidade, p.Tipo, p.Fornecedor, p.Localizacao })
+                .ToList();
+
+            ViewBag.ExportUnidades = dados
                 .Select(p => p.Unidade)
-                .Where(x => x != null && x.Trim() != "")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!.Trim())
                 .Distinct()
                 .OrderBy(x => x)
                 .ToList();
 
-            ViewBag.ExportTipos = _context.Patrimonios
-                .AsNoTracking()
+            ViewBag.ExportTipos = dados
                 .Select(p => p.Tipo)
-                .Where(x => x != null && x.Trim() != "")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!.Trim())
                 .Distinct()
                 .OrderBy(x => x)
                 .ToList();
 
-            ViewBag.ExportFornecedores = _context.Patrimonios
-                .AsNoTracking()
+            ViewBag.ExportFornecedores = dados
                 .Select(p => p.Fornecedor)
-                .Where(x => x != null && x.Trim() != "")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x!.Trim())
                 .Distinct()
                 .OrderBy(x => x)
                 .ToList();
@@ -170,12 +174,9 @@ namespace PatriControl.Web.Controllers
             ViewBag.ExportStatus = _statusFiltroOptions.ToList();
             ViewBag.ExportCondicoes = _condicaoOptions.ToList();
 
-            // Localizações dependentes por Unidade (baseado nos dados cadastrados)
-            var locMap = _context.Patrimonios
-                .AsNoTracking()
-                .Where(p =>
-                    p.Unidade != null && p.Unidade.Trim() != "" &&
-                    p.Localizacao != null && p.Localizacao.Trim() != "")
+            // Localizações dependentes por Unidade (baseado nos dados já carregados)
+            var locMap = dados
+                .Where(p => !string.IsNullOrWhiteSpace(p.Unidade) && !string.IsNullOrWhiteSpace(p.Localizacao))
                 .GroupBy(p => p.Unidade!.Trim())
                 .ToDictionary(
                     g => g.Key,
@@ -361,7 +362,7 @@ namespace PatriControl.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(Patrimonio patrimonio)
+        public async Task<IActionResult> Create(Patrimonio patrimonio)
         {
             var uid = GetUserId();
 
@@ -386,7 +387,7 @@ namespace PatriControl.Web.Controllers
             {
                 if (_context.Patrimonios.Any(p => p.Numero == patrimonio.Numero))
                 {
-                    TryAudit(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, $"Número duplicado: {patrimonio.Numero}");
+                    await TryAuditAsync(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, $"Número duplicado: {patrimonio.Numero}");
                     TempData["ErrorMessage"] = "Já existe um patrimônio com este número.";
                     return RedirectToAction(nameof(Index));
                 }
@@ -396,7 +397,7 @@ namespace PatriControl.Web.Controllers
             if (!string.IsNullOrWhiteSpace(patrimonio.Status) &&
                 string.Equals(patrimonio.Status.Trim(), "Em manutenção", StringComparison.OrdinalIgnoreCase))
             {
-                TryAudit(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, "Tentou setar status 'Em manutenção'.");
+                await TryAuditAsync(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, "Tentou setar status 'Em manutenção'.");
                 TempData["ErrorMessage"] = "O status 'Em manutenção' só é definido automaticamente ao abrir uma manutenção.";
                 return RedirectToAction(nameof(Index));
             }
@@ -406,7 +407,7 @@ namespace PatriControl.Web.Controllers
                 patrimonio.Status = "Ativo";
             else if (!_statusSet.Contains(patrimonio.Status.Trim()))
             {
-                TryAudit(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, $"Status inválido: {patrimonio.Status}");
+                await TryAuditAsync(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, $"Status inválido: {patrimonio.Status}");
                 TempData["ErrorMessage"] = "Status inválido.";
                 return RedirectToAction(nameof(Index));
             }
@@ -418,7 +419,7 @@ namespace PatriControl.Web.Controllers
                 patrimonio.Condicao = "Novo";
             else if (!_condicaoSet.Contains(patrimonio.Condicao.Trim()))
             {
-                TryAudit(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, $"Condição inválida: {patrimonio.Condicao}");
+                await TryAuditAsync(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, $"Condição inválida: {patrimonio.Condicao}");
                 TempData["ErrorMessage"] = "Condição inválida.";
                 return RedirectToAction(nameof(Index));
             }
@@ -427,7 +428,7 @@ namespace PatriControl.Web.Controllers
 
             if (!ModelState.IsValid)
             {
-                TryAudit(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, "ModelState inválido.");
+                await TryAuditAsync(uid, "Tentou criar patrimônio (falhou)", "Patrimonio", null, "ModelState inválido.");
                 TempData["ErrorMessage"] = "Não foi possível criar. Verifique os campos obrigatórios.";
                 return RedirectToAction(nameof(Index));
             }
@@ -455,7 +456,7 @@ namespace PatriControl.Web.Controllers
 
             _context.SaveChanges();
 
-            TryAudit(uid, "Criou patrimônio", "Patrimonio", patrimonio.Id,
+            await TryAuditAsync(uid, "Criou patrimônio", "Patrimonio", patrimonio.Id,
                 $"Numero={patrimonio.Numero ?? ""} | Descricao={patrimonio.Descricao ?? ""}");
 
             TempData["SuccessMessage"] = "Patrimônio criado com sucesso.";
@@ -467,7 +468,7 @@ namespace PatriControl.Web.Controllers
         // =========================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit(Patrimonio patrimonio)
+        public async Task<IActionResult> Edit(Patrimonio patrimonio)
         {
             var uid = GetUserId();
 
@@ -486,14 +487,14 @@ namespace PatriControl.Web.Controllers
             var existente = _context.Patrimonios.FirstOrDefault(p => p.Id == patrimonio.Id);
             if (existente == null)
             {
-                TryAudit(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", patrimonio.Id, "Patrimônio não encontrado.");
+                await TryAuditAsync(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", patrimonio.Id, "Patrimônio não encontrado.");
                 return NotFound();
             }
 
             // bloqueia se estiver em manutenção
             if (string.Equals(existente.Status?.Trim(), "Em manutenção", StringComparison.OrdinalIgnoreCase))
             {
-                TryAudit(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", existente.Id, "Patrimônio em manutenção (bloqueado).");
+                await TryAuditAsync(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", existente.Id, "Patrimônio em manutenção (bloqueado).");
                 TempData["ErrorMessage"] = "Este patrimônio está em manutenção e não pode ser editado.";
                 return RedirectToAction(nameof(Index));
             }
@@ -507,7 +508,7 @@ namespace PatriControl.Web.Controllers
                 var duplicado = _context.Patrimonios.Any(p => p.Id != existente.Id && p.Numero == patrimonio.Numero);
                 if (duplicado)
                 {
-                    TryAudit(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", existente.Id, $"Número duplicado: {patrimonio.Numero}");
+                    await TryAuditAsync(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", existente.Id, $"Número duplicado: {patrimonio.Numero}");
                     TempData["ErrorMessage"] = "Já existe outro patrimônio com este número.";
                     return RedirectToAction(nameof(Index));
                 }
@@ -518,7 +519,7 @@ namespace PatriControl.Web.Controllers
 
             if (string.Equals(statusNovo, "Em manutenção", StringComparison.OrdinalIgnoreCase))
             {
-                TryAudit(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", existente.Id, "Tentou setar status 'Em manutenção'.");
+                await TryAuditAsync(uid, "Tentou editar patrimônio (falhou)", "Patrimonio", existente.Id, "Tentou setar status 'Em manutenção'.");
                 TempData["ErrorMessage"] = "O status 'Em manutenção' só é definido automaticamente ao abrir uma manutenção.";
                 return RedirectToAction(nameof(Index));
             }
@@ -599,19 +600,19 @@ namespace PatriControl.Web.Controllers
             existente.Status = statusNovo;
             existente.Condicao = condicaoNova;
 
-            if (alteracoes.Any())
+            if (alteracoes.Count > 0)
                 _context.Tramites.AddRange(alteracoes);
 
             _context.SaveChanges();
 
-            if (alteracoes.Any())
+            if (alteracoes.Count > 0)
             {
                 var detalhes = string.Join(" | ", alteracoes.Select(a => $"{a.Campo}: '{a.ValorAntigo}' -> '{a.ValorNovo}'"));
-                TryAudit(uid, "Editou patrimônio", "Patrimonio", existente.Id, detalhes);
+                await TryAuditAsync(uid, "Editou patrimônio", "Patrimonio", existente.Id, detalhes);
             }
             else
             {
-                TryAudit(uid, "Editou patrimônio (sem alterações)", "Patrimonio", existente.Id, "Nenhuma alteração detectada.");
+                await TryAuditAsync(uid, "Editou patrimônio (sem alterações)", "Patrimonio", existente.Id, "Nenhuma alteração detectada.");
             }
 
             TempData["SuccessMessage"] = "Patrimônio atualizado com sucesso.";
@@ -623,7 +624,7 @@ namespace PatriControl.Web.Controllers
         // =========================================================
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult AdicionarTramitePersonalizado(int patrimonioId, string texto)
+        public async Task<IActionResult> AdicionarTramitePersonalizado(int patrimonioId, string texto)
         {
             var uid = GetUserId();
 
@@ -637,7 +638,7 @@ namespace PatriControl.Web.Controllers
             var existe = _context.Patrimonios.AsNoTracking().Any(p => p.Id == patrimonioId);
             if (!existe)
             {
-                TryAudit(uid, "Tentou adicionar trâmite personalizado (falhou)", "Patrimonio", patrimonioId, "Patrimônio não encontrado.");
+                await TryAuditAsync(uid, "Tentou adicionar trâmite personalizado (falhou)", "Patrimonio", patrimonioId, "Patrimônio não encontrado.");
                 return Json(new { ok = false, message = "Patrimônio não encontrado." });
             }
 
@@ -660,7 +661,7 @@ namespace PatriControl.Web.Controllers
 
             _context.SaveChanges();
 
-            TryAudit(uid, "Adicionou trâmite personalizado", "Patrimonio", patrimonioId, $"Texto='{texto}'");
+            await TryAuditAsync(uid, "Adicionou trâmite personalizado", "Patrimonio", patrimonioId, $"Texto='{texto}'");
 
             return Json(new { ok = true });
         }
@@ -672,6 +673,7 @@ namespace PatriControl.Web.Controllers
         public IActionResult Tramites(int id)
         {
             var tramites = _context.Tramites
+                .AsNoTracking()
                 .Where(t => t.PatrimonioId == id)
                 .OrderByDescending(t => t.DataHora)
                 .ThenByDescending(t => t.Id)

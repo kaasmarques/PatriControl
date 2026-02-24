@@ -90,22 +90,8 @@ builder.Services.ConfigureApplicationCookie(options =>
             ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
 
-    // Revalida usuário/ativo a cada request (sem “cookie mentir”)
-    options.Events = new Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationEvents
-    {
-        OnValidatePrincipal = async context =>
-        {
-            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<Usuario>>();
-            var user = await userManager.GetUserAsync(context.Principal!);
-
-            if (user == null || !string.Equals(user.Status, "Ativo", StringComparison.OrdinalIgnoreCase))
-            {
-                context.RejectPrincipal();
-                await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
-                return;
-            }
-        }
-    };
+    // Validação de usuário ativo é feita no UsuarioAtivoMiddleware
+    // (removida daqui para evitar dupla ida ao banco por request)
 });
 
 // =====================

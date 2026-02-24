@@ -27,11 +27,11 @@ namespace PatriControl.Web.Controllers
             return null;
         }
 
-        private void TryAudit(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
+        private async Task TryAuditAsync(int? usuarioId, string acao, string? entidade = null, int? entidadeId = null, string? detalhes = null)
         {
             try
             {
-                _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes).GetAwaiter().GetResult();
+                await _audit.LogAsync(usuarioId, acao, entidade, entidadeId, detalhes);
             }
             catch
             {
@@ -104,7 +104,7 @@ namespace PatriControl.Web.Controllers
         // ---------------------------------------------------------
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(string nome)
+        public async Task<IActionResult> Create(string nome)
         {
             var uid = GetUserId();
 
@@ -112,7 +112,7 @@ namespace PatriControl.Web.Controllers
 
             if (string.IsNullOrWhiteSpace(nome))
             {
-                TryAudit(uid, "Tentou criar fornecedor (falhou)", "Fornecedor", null, "Nome vazio/nulo.");
+                await TryAuditAsync(uid, "Tentou criar fornecedor (falhou)", "Fornecedor", null, "Nome vazio/nulo.");
                 TempData["ErrorMessage"] = "Informe o nome do fornecedor.";
                 return RedirectToAction(nameof(Index));
             }
@@ -123,7 +123,7 @@ namespace PatriControl.Web.Controllers
             var existe = _context.Fornecedores.Any(f => (f.Nome ?? "").ToLower() == nomeLower);
             if (existe)
             {
-                TryAudit(uid, "Tentou criar fornecedor (falhou)", "Fornecedor", null, $"Duplicado: {nome}");
+                await TryAuditAsync(uid, "Tentou criar fornecedor (falhou)", "Fornecedor", null, $"Duplicado: {nome}");
                 TempData["ErrorMessage"] = "Já existe um fornecedor com esse nome.";
                 return RedirectToAction(nameof(Index));
             }
@@ -133,7 +133,7 @@ namespace PatriControl.Web.Controllers
             _context.SaveChanges();
 
             // AUDIT (sucesso)
-            TryAudit(uid, "Criou fornecedor", "Fornecedor", fornecedor.Id, $"Nome={nome}");
+            await TryAuditAsync(uid, "Criou fornecedor", "Fornecedor", fornecedor.Id, $"Nome={nome}");
 
             TempData["SuccessMessage"] = "Fornecedor criado com sucesso.";
             return RedirectToAction(nameof(Index));
@@ -144,7 +144,7 @@ namespace PatriControl.Web.Controllers
         // ---------------------------------------------------------
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit(int id, string nome)
+        public async Task<IActionResult> Edit(int id, string nome)
         {
             var uid = GetUserId();
 
@@ -152,7 +152,7 @@ namespace PatriControl.Web.Controllers
 
             if (string.IsNullOrWhiteSpace(nome))
             {
-                TryAudit(uid, "Tentou editar fornecedor (falhou)", "Fornecedor", id, "Nome vazio/nulo.");
+                await TryAuditAsync(uid, "Tentou editar fornecedor (falhou)", "Fornecedor", id, "Nome vazio/nulo.");
                 TempData["ErrorMessage"] = "Informe o nome do fornecedor.";
                 return RedirectToAction(nameof(Index));
             }
@@ -160,7 +160,7 @@ namespace PatriControl.Web.Controllers
             var fornecedor = _context.Fornecedores.FirstOrDefault(f => f.Id == id);
             if (fornecedor == null)
             {
-                TryAudit(uid, "Tentou editar fornecedor (falhou)", "Fornecedor", id, "Fornecedor não encontrado.");
+                await TryAuditAsync(uid, "Tentou editar fornecedor (falhou)", "Fornecedor", id, "Fornecedor não encontrado.");
                 TempData["ErrorMessage"] = "Fornecedor não encontrado.";
                 return RedirectToAction(nameof(Index));
             }
@@ -173,7 +173,7 @@ namespace PatriControl.Web.Controllers
 
             if (duplicado)
             {
-                TryAudit(uid, "Tentou editar fornecedor (falhou)", "Fornecedor", id, $"Duplicado: {nome}");
+                await TryAuditAsync(uid, "Tentou editar fornecedor (falhou)", "Fornecedor", id, $"Duplicado: {nome}");
                 TempData["ErrorMessage"] = "Já existe outro fornecedor com esse nome.";
                 return RedirectToAction(nameof(Index));
             }
@@ -195,7 +195,7 @@ namespace PatriControl.Web.Controllers
 
             // AUDIT (sucesso)
             var detalhes = $"Id={id} | Nome: {nomeAntigo} -> {nome} | PatrimoniosAtualizados={patrimonios.Count}";
-            TryAudit(uid, "Editou fornecedor", "Fornecedor", id, detalhes);
+            await TryAuditAsync(uid, "Editou fornecedor", "Fornecedor", id, detalhes);
 
             TempData["SuccessMessage"] = "Fornecedor alterado com sucesso.";
             return RedirectToAction(nameof(Index));
