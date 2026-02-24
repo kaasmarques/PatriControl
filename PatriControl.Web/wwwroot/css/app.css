@@ -465,7 +465,8 @@ body,
 }
 
 .badge-status-em-manutencao,
-.badge-status-manutencao {
+.badge-status-manutencao,
+.app-badge-status-manutencao {
     background: rgba(255,193,7,.18);
     border-color: rgba(255,193,7,.40);
     color: #fff;
