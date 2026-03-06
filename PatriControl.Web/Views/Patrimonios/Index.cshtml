@@ -396,7 +396,14 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title text-white">Detalhes do Patrimônio</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                <button type="button"
+                        class="app-icon-btn ms-2"
+                        aria-label="Duplicar patrimônio"
+                        title="Duplicar patrimônio"
+                        onclick="abrirDuplicarPatrimonio()">
+                    <i class="bi bi-copy" style="font-size:22px;"></i>
+                </button>
+                <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
 
             <div class="modal-body">
@@ -821,6 +828,49 @@
     </div>
 </div>
 
+<!-- =================================================
+   MODAL: DUPLICAR PATRIMÔNIO
+   ================================================= -->
+<div class="modal fade" id="modal-duplicar-patrimonio" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:440px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-white">Duplicar Patrimônio</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+
+            <form id="form-duplicar-patrimonio">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="dup-patrimonio-id" />
+
+                <div class="modal-body">
+                    <div class="app-muted mb-3">
+                        Serão criadas cópias do patrimônio <b id="dup-descricao" class="text-white"></b>.
+                        O <b class="text-white">Nº do Patrimônio</b> ficará em branco em todas as cópias.
+                    </div>
+
+                    <label class="form-label app-label app-label-required">Quantidade de cópias</label>
+                    <input type="number"
+                           class="form-control"
+                           id="dup-quantidade"
+                           min="1"
+                           max="100"
+                           value="1"
+                           required />
+                    <div class="app-muted small mt-1">Máximo: 100 por vez.</div>
+
+                    <div id="dup-erro" class="text-danger small mt-2" style="display:none;"></div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-primary" id="dup-btn-salvar">Duplicar</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
         const unidades = @Html.Raw(unidadesJs);
@@ -903,7 +953,6 @@
         // EXPORT EXCEL (modal)
         // =========================================================
         function abrirExportarExcel() {
-            // reset padrão
             const u = document.getElementById('exp-unidade');
             const l = document.getElementById('exp-localizacao');
             if (u) u.value = "";
@@ -919,7 +968,6 @@
             const locSelect = document.getElementById('exp-localizacao');
             if (!locSelect) return;
 
-            // limpa e bloqueia por padrão
             locSelect.innerHTML = `<option value="">(Todas)</option>`;
             locSelect.disabled = true;
 
@@ -941,16 +989,6 @@
             locSelect.disabled = false;
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
-            const selUnidade = document.getElementById('exp-unidade');
-            if (selUnidade) {
-                selUnidade.addEventListener('change', function () {
-                    // ao trocar unidade, recria localizações
-                    updateLocalizacoesExport();
-                });
-            }
-        });
-
         // =========================================================
         // Combobox: Unidade (Filtro)
         // =========================================================
@@ -960,7 +998,7 @@
             const hidden = document.getElementById('filtro-unidade-value');
             const q = (input.value || '').toLowerCase().trim();
 
-            hidden.value = ""; // desseleciona até clicar numa opção
+            hidden.value = "";
 
             if (!q) { box.style.display = 'none'; return; }
 
@@ -1009,7 +1047,6 @@
             hiddenValue.value = "";
             hiddenId.value = "";
 
-            // ao digitar unidade, limpa localização
             document.getElementById('create-localizacao-value').value = "";
             document.getElementById('create-localizacao-busca').value = "";
 
@@ -1046,7 +1083,6 @@
             document.getElementById('create-unidade-value').value = (u.display || '').trim();
             document.getElementById('create-unidade-busca').value = (u.display || '').trim();
 
-            // limpa localização ao trocar unidade
             document.getElementById('create-localizacao-value').value = "";
             document.getElementById('create-localizacao-busca').value = "";
 
@@ -1054,7 +1090,7 @@
         }
 
         // =========================================================
-        // Combobox: Localização (Create) - depende unidadeId
+        // Combobox: Localização (Create)
         // =========================================================
         function filtrarLocalizacoesCreate() {
             const unidadeId = parseInt(document.getElementById('create-unidade-id').value || "0");
@@ -1190,7 +1226,6 @@
             hiddenValue.value = "";
             hiddenId.value = "";
 
-            // ao digitar unidade, limpa localização
             document.getElementById('edit-localizacao-value').value = "";
             document.getElementById('edit-localizacao-busca').value = "";
 
@@ -1227,7 +1262,6 @@
             document.getElementById('edit-unidade-value').value = (u.display || '').trim();
             document.getElementById('edit-unidade-busca').value = (u.display || '').trim();
 
-            // limpa localização ao trocar unidade
             document.getElementById('edit-localizacao-value').value = "";
             document.getElementById('edit-localizacao-busca').value = "";
 
@@ -1364,42 +1398,8 @@
             if (found) hidden.value = (found[propName] || "").trim();
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
-            const formCreate = document.getElementById('form-create-patrimonio');
-            if (formCreate) {
-                formCreate.addEventListener('submit', function (e) {
-                    trySyncExactFromInput('create-tipo-busca', 'create-tipo-value', tipos, 'nome');
-                    trySyncExactFromInput('create-fornecedor-busca', 'create-fornecedor-value', fornecedores, 'nome');
-
-                    const tipoHidden = (document.getElementById('create-tipo-value')?.value || "").trim();
-                    const tipoInput = (document.getElementById('create-tipo-busca')?.value || "").trim();
-
-                    if (!tipoHidden && tipoInput) {
-                        e.preventDefault();
-                        alert("Selecione um Tipo válido na lista.");
-                    }
-                });
-            }
-
-            const formEdit = document.getElementById('form-edit-patrimonio');
-            if (formEdit) {
-                formEdit.addEventListener('submit', function (e) {
-                    trySyncExactFromInput('edit-tipo-busca', 'edit-tipo-value', tipos, 'nome');
-                    trySyncExactFromInput('edit-fornecedor-busca', 'edit-fornecedor-value', fornecedores, 'nome');
-
-                    const tipoHidden = (document.getElementById('edit-tipo-value')?.value || "").trim();
-                    const tipoInput = (document.getElementById('edit-tipo-busca')?.value || "").trim();
-
-                    if (tipoInput && !tipoHidden) {
-                        e.preventDefault();
-                        alert("Selecione um Tipo válido na lista.");
-                    }
-                });
-            }
-        });
-
         // =========================================================
-        // Tramites / Detalhes (mantido)
+        // Tramites / Detalhes
         // =========================================================
         function formatarDataHoraBr(iso) {
             if (!iso) return "";
@@ -1488,7 +1488,6 @@
             let p = {};
             try { p = JSON.parse(json); } catch { }
 
-            //  define o patrimônio atual para o trâmite personalizado
             patrimonioAtualId = p.id || 0;
 
             document.getElementById('det-numero').value          = p.numero || '';
@@ -1552,7 +1551,6 @@
             document.getElementById('edit-status').value = p.status || 'Ativo';
             document.getElementById('edit-condicao').value = p.condicao || 'Novo';
 
-            // Unidade / Localização
             const unidadeDisplay = (p.unidade || '').trim();
             const unidadeObj = getUnidadeByDisplay(unidadeDisplay);
             const unidadeId = unidadeObj ? unidadeObj.id : 0;
@@ -1565,7 +1563,6 @@
             document.getElementById('edit-localizacao-busca').value = loc;
             document.getElementById('edit-localizacao-value').value = loc;
 
-            // Tipo / Fornecedor
             const tipo = (p.tipo || '').trim();
             document.getElementById('edit-tipo-busca').value = tipo;
             document.getElementById('edit-tipo-value').value = tipo;
@@ -1581,7 +1578,6 @@
             const form = document.querySelector('#modal-criar-patrimonio form');
             if (form) form.reset();
 
-            // limpa comboboxes (create)
             document.getElementById('create-unidade-id').value = "";
             document.getElementById('create-unidade-value').value = "";
             document.getElementById('create-unidade-busca').value = "";
@@ -1616,45 +1612,34 @@
             setTimeout(() => document.getElementById('tp-texto')?.focus(), 150);
         }
 
-        document.addEventListener('DOMContentLoaded', function () {
-            const formTramite = document.getElementById('form-tramite-personalizado');
-            if (formTramite) {
-                formTramite.addEventListener('submit', function (e) {
-                    e.preventDefault();
-
-                    const texto = (document.getElementById('tp-texto').value || "").trim();
-                    if (!texto) {
-                        showToast("Informe o trâmite.", "danger");
-                        return;
-                    }
-
-                    const token = getAntiForgeryToken('form-tramite-personalizado');
-                    const body = new URLSearchParams();
-                    body.append("__RequestVerificationToken", token);
-                    body.append("patrimonioId", String(patrimonioAtualId));
-                    body.append("texto", texto);
-
-                    fetch('/Patrimonios/AdicionarTramitePersonalizado', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: body.toString()
-                    })
-                        .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao salvar." })
-                        .then(res => {
-                            if (!res.ok) {
-                                showToast(res.message || "Erro ao salvar.", "danger");
-                                return;
-                            }
-
-                            hideModal('modal-tramite-personalizado');
-                            carregarTramites(patrimonioAtualId);
-                            showToast("Trâmite registrado com sucesso.", "success");
-                        })
-                        .catch(() => showToast("Erro ao salvar.", "danger"));
-                });
+        // =========================================================
+        // Duplicar patrimônio
+        // =========================================================
+        function abrirDuplicarPatrimonio() {
+            if (!patrimonioAtualId) {
+                showToast("Patrimônio inválido.", "danger");
+                return;
             }
-        });
 
+            const descricao = document.getElementById('det-descricao')?.value || "";
+
+            document.getElementById('dup-patrimonio-id').value = patrimonioAtualId;
+            document.getElementById('dup-descricao').textContent = descricao;
+            document.getElementById('dup-quantidade').value = "1";
+
+            const erro = document.getElementById('dup-erro');
+            if (erro) { erro.style.display = 'none'; erro.textContent = ''; }
+
+            const btnSalvar = document.getElementById('dup-btn-salvar');
+            if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = "Duplicar"; }
+
+            showModal('modal-duplicar-patrimonio');
+            setTimeout(() => document.getElementById('dup-quantidade')?.focus(), 150);
+        }
+
+        // =========================================================
+        // Helpers: Token + Toast
+        // =========================================================
         function getAntiForgeryToken(formId) {
             const form = document.getElementById(formId);
             const token = form?.querySelector('input[name="__RequestVerificationToken"]');
@@ -1691,5 +1676,153 @@
 
             toast.addEventListener("hidden.bs.toast", () => toast.remove());
         }
+
+        // =========================================================
+        // DOMContentLoaded — event listeners dos forms
+        // =========================================================
+        document.addEventListener('DOMContentLoaded', function () {
+            // Export: change unidade
+            const selUnidade = document.getElementById('exp-unidade');
+            if (selUnidade) {
+                selUnidade.addEventListener('change', function () {
+                    updateLocalizacoesExport();
+                });
+            }
+
+            // Validação Create
+            const formCreate = document.getElementById('form-create-patrimonio');
+            if (formCreate) {
+                formCreate.addEventListener('submit', function (e) {
+                    trySyncExactFromInput('create-tipo-busca', 'create-tipo-value', tipos, 'nome');
+                    trySyncExactFromInput('create-fornecedor-busca', 'create-fornecedor-value', fornecedores, 'nome');
+
+                    const tipoHidden = (document.getElementById('create-tipo-value')?.value || "").trim();
+                    const tipoInput = (document.getElementById('create-tipo-busca')?.value || "").trim();
+
+                    if (!tipoHidden && tipoInput) {
+                        e.preventDefault();
+                        alert("Selecione um Tipo válido na lista.");
+                    }
+                });
+            }
+
+            // Validação Edit
+            const formEdit = document.getElementById('form-edit-patrimonio');
+            if (formEdit) {
+                formEdit.addEventListener('submit', function (e) {
+                    trySyncExactFromInput('edit-tipo-busca', 'edit-tipo-value', tipos, 'nome');
+                    trySyncExactFromInput('edit-fornecedor-busca', 'edit-fornecedor-value', fornecedores, 'nome');
+
+                    const tipoHidden = (document.getElementById('edit-tipo-value')?.value || "").trim();
+                    const tipoInput = (document.getElementById('edit-tipo-busca')?.value || "").trim();
+
+                    if (tipoInput && !tipoHidden) {
+                        e.preventDefault();
+                        alert("Selecione um Tipo válido na lista.");
+                    }
+                });
+            }
+
+            // Trâmite personalizado (AJAX)
+            const formTramite = document.getElementById('form-tramite-personalizado');
+            if (formTramite) {
+                formTramite.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const texto = (document.getElementById('tp-texto').value || "").trim();
+                    if (!texto) {
+                        showToast("Informe o trâmite.", "danger");
+                        return;
+                    }
+
+                    const token = getAntiForgeryToken('form-tramite-personalizado');
+                    const body = new URLSearchParams();
+                    body.append("__RequestVerificationToken", token);
+                    body.append("patrimonioId", String(patrimonioAtualId));
+                    body.append("texto", texto);
+
+                    fetch('/Patrimonios/AdicionarTramitePersonalizado', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: body.toString()
+                    })
+                        .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao salvar." })
+                        .then(res => {
+                            if (!res.ok) {
+                                showToast(res.message || "Erro ao salvar.", "danger");
+                                return;
+                            }
+
+                            hideModal('modal-tramite-personalizado');
+                            carregarTramites(patrimonioAtualId);
+                            showToast("Trâmite registrado com sucesso.", "success");
+                        })
+                        .catch(() => showToast("Erro ao salvar.", "danger"));
+                });
+            }
+
+            // Duplicar patrimônio (AJAX)
+            const formDup = document.getElementById('form-duplicar-patrimonio');
+            if (formDup) {
+                formDup.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const quantidade = parseInt(document.getElementById('dup-quantidade').value || "0", 10);
+                    const erro = document.getElementById('dup-erro');
+                    const btnSalvar = document.getElementById('dup-btn-salvar');
+
+                    const showErr = (msg) => {
+                        if (!erro) return;
+                        erro.textContent = msg;
+                        erro.style.display = 'block';
+                    };
+
+                    if (!quantidade || quantidade < 1 || quantidade > 100) {
+                        showErr("Informe uma quantidade entre 1 e 100.");
+                        return;
+                    }
+
+                    if (erro) { erro.style.display = 'none'; erro.textContent = ''; }
+
+                    btnSalvar.disabled = true;
+                    btnSalvar.textContent = "Duplicando...";
+
+                    const token = getAntiForgeryToken('form-duplicar-patrimonio');
+                    const body = new URLSearchParams();
+                    body.append("__RequestVerificationToken", token);
+                    body.append("patrimonioId", String(patrimonioAtualId));
+                    body.append("quantidade", String(quantidade));
+
+                    fetch('/Patrimonios/Duplicar', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: body.toString()
+                    })
+                        .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao duplicar." })
+                        .then(res => {
+                            btnSalvar.disabled = false;
+                            btnSalvar.textContent = "Duplicar";
+
+                            if (!res.ok) {
+                                showErr(res.message || "Erro ao duplicar.");
+                                return;
+                            }
+
+                            hideModal('modal-duplicar-patrimonio');
+                            showToast(
+                                res.quantidade === 1
+                                    ? "1 cópia criada com sucesso."
+                                    : `${res.quantidade} cópias criadas com sucesso.`,
+                                "success"
+                            );
+                        })
+                        .catch(() => {
+                            btnSalvar.disabled = false;
+                            btnSalvar.textContent = "Duplicar";
+                            showErr("Erro ao duplicar. Tente novamente.");
+                        });
+                });
+            }
+        });
     </script>
 }

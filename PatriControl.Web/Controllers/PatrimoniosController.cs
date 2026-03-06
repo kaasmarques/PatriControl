@@ -681,5 +681,73 @@ namespace PatriControl.Web.Controllers
 
             return Json(tramites);
         }
+
+        // =========================================================
+        // DUPLICAR (AJAX)
+        // =========================================================
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Duplicar(int patrimonioId, int quantidade)
+        {
+            var uid = GetUserId();
+
+            if (patrimonioId <= 0)
+                return Json(new { ok = false, message = "Patrimônio inválido." });
+
+            if (quantidade < 1 || quantidade > 100)
+                return Json(new { ok = false, message = "Informe uma quantidade entre 1 e 100." });
+
+            var origem = _context.Patrimonios.AsNoTracking().FirstOrDefault(p => p.Id == patrimonioId);
+            if (origem == null)
+            {
+                await TryAuditAsync(uid, "Tentou duplicar patrimônio (falhou)", "Patrimonio", patrimonioId, "Patrimônio não encontrado.");
+                return Json(new { ok = false, message = "Patrimônio não encontrado." });
+            }
+
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            int.TryParse(userIdStr, out var usuarioId);
+            var nomeUsuario = User.Identity?.Name ?? "Desconhecido";
+            var agora = DateTime.Now;
+
+            for (int i = 0; i < quantidade; i++)
+            {
+                var novo = new Patrimonio
+                {
+                    Numero        = null,
+                    Descricao     = origem.Descricao,
+                    Unidade       = origem.Unidade,
+                    Localizacao   = origem.Localizacao,
+                    Tipo          = origem.Tipo,
+                    Fornecedor    = origem.Fornecedor,
+                    NumeroSerieNF = origem.NumeroSerieNF,
+                    NumeroNF      = origem.NumeroNF,
+                    Valor         = origem.Valor,
+                    DataCompra    = origem.DataCompra,
+                    Status        = origem.Status,
+                    Condicao      = origem.Condicao,
+                    ImagemPath    = string.Empty,
+                    CriadoPorId   = usuarioId,
+                    CriadoEm      = agora
+                };
+
+                _context.Patrimonios.Add(novo);
+
+                _context.Tramites.Add(new Tramite
+                {
+                    Patrimonio   = novo,
+                    UsuarioId    = usuarioId,
+                    NomeUsuario  = nomeUsuario,
+                    Tipo         = "CRIACAO",
+                    DataHora     = agora
+                });
+            }
+
+            _context.SaveChanges();
+
+            await TryAuditAsync(uid, "Duplicou patrimônio", "Patrimonio", patrimonioId,
+                $"Origem={patrimonioId} | Quantidade={quantidade}");
+
+            return Json(new { ok = true, quantidade });
+        }
     }
 }

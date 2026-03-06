@@ -58,7 +58,6 @@ namespace PatriControl.Web.Controllers
         // ============================================================
         public IActionResult Index(string? filtro, int page = 1, int pageSize = 10)
         {
-            // pageSize fixo (mude aqui se quiser)
             pageSize = 10;
             if (page < 1) page = 1;
 
@@ -68,8 +67,10 @@ namespace PatriControl.Web.Controllers
 
             if (!string.IsNullOrWhiteSpace(filtro))
             {
-                filtro = filtro.Trim();
-                queryBase = queryBase.Where(u => u.Per.Contains(filtro) || u.Nome.Contains(filtro));
+                var f = filtro.Trim().ToLower();
+                queryBase = queryBase.Where(u =>
+                    u.Per.ToLower().Contains(f) ||
+                    u.Nome.ToLower().Contains(f));
             }
 
             var total = queryBase.Count();
@@ -93,9 +94,7 @@ namespace PatriControl.Web.Controllers
             ViewBag.TotalPages = totalPages;
             ViewBag.Exibindo = lista.Count;
 
-            // ===== PAGINAÇÃO (PADRÃO DO SISTEMA) =====
             var routeValues = new Dictionary<string, object?>();
-
             if (!string.IsNullOrWhiteSpace(filtro)) routeValues["filtro"] = filtro.Trim();
 
             ViewBag.Paginacao = new PaginacaoViewModel
