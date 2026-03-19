@@ -20,6 +20,7 @@ namespace PatriControl.Web.Controllers
     {
         private readonly PatriControlContext _context;
         private readonly IAuditLogger _audit;
+        private readonly IWebHostEnvironment _env;
 
         // Create/Edit (NÃO inclui "Em manutenção")
         private static readonly string[] _statusOptions =
@@ -54,10 +55,11 @@ namespace PatriControl.Web.Controllers
         private static readonly HashSet<string> _condicaoSet =
             new HashSet<string>(_condicaoOptions, StringComparer.OrdinalIgnoreCase);
 
-        public PatrimoniosController(PatriControlContext context, IAuditLogger audit)
+        public PatrimoniosController(PatriControlContext context, IAuditLogger audit, IWebHostEnvironment env)
         {
             _context = context;
             _audit = audit;
+            _env = env;
         }
 
         // =========================================================
@@ -362,7 +364,7 @@ namespace PatriControl.Web.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(Patrimonio patrimonio)
+        public async Task<IActionResult> Create(Patrimonio patrimonio, List<IFormFile>? fotos)
         {
             var uid = GetUserId();
 
@@ -445,19 +447,58 @@ namespace PatriControl.Web.Controllers
 
             _context.Patrimonios.Add(patrimonio);
 
-            _context.Tramites.Add(new Tramite
-            {
-                Patrimonio = patrimonio,
-                UsuarioId = criadoPorId,
-                NomeUsuario = nomeUsuarioCriacao,
-                Tipo = "CRIACAO",
-                DataHora = DateTime.Now
+        _context.Tramites.Add(new Tramite
+   {
+      Patrimonio = patrimonio,
+         UsuarioId = criadoPorId,
+             NomeUsuario = nomeUsuarioCriacao,
+    Tipo = "CRIACAO",
+              DataHora = DateTime.Now
             });
 
-            _context.SaveChanges();
+        _context.SaveChanges();
 
-            await TryAuditAsync(uid, "Criou patrimônio", "Patrimonio", patrimonio.Id,
-                $"Numero={patrimonio.Numero ?? ""} | Descricao={patrimonio.Descricao ?? ""}");
+            // Upload de fotos do patrimônio recém-criado
+            if (fotos != null && fotos.Count > 0)
+    {
+        var extensoesPermitidas = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+ {
+               ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"
+      };
+
+          var pastaUpload = Path.Combine(_env.WebRootPath, "uploads", "patrimonios");
+            Directory.CreateDirectory(pastaUpload);
+
+     foreach (var arquivo in fotos)
+                {
+   if (arquivo.Length == 0 || arquivo.Length > 10 * 1024 * 1024) continue;
+
+             var ext = Path.GetExtension(arquivo.FileName);
+             if (!extensoesPermitidas.Contains(ext)) continue;
+
+             var nomeArquivo = $"{Guid.NewGuid()}{ext}";
+        var caminhoCompleto = Path.Combine(pastaUpload, nomeArquivo);
+         var caminhoRelativo = Path.Combine("uploads", "patrimonios", nomeArquivo);
+
+    using (var stream = new FileStream(caminhoCompleto, FileMode.Create))
+       {
+          await arquivo.CopyToAsync(stream);
+        }
+
+       _context.PatrimonioFotos.Add(new PatrimonioFoto
+         {
+      PatrimonioId = patrimonio.Id,
+  CaminhoArquivo = caminhoRelativo,
+          NomeOriginal = arquivo.FileName,
+    CriadoEm = DateTime.Now
+  });
+        }
+
+_context.SaveChanges();
+     }
+
+      await TryAuditAsync(uid, "Criou patrimônio", "Patrimonio", patrimonio.Id,
+     $"Numero={patrimonio.Numero ?? ""} | Descricao={patrimonio.Descricao ?? ""}");
 
             TempData["SuccessMessage"] = "Patrimônio criado com sucesso.";
             return RedirectToAction(nameof(Index));
@@ -723,7 +764,7 @@ namespace PatriControl.Web.Controllers
                     NumeroNF      = origem.NumeroNF,
                     Valor         = origem.Valor,
                     DataCompra    = origem.DataCompra,
-                    Status        = origem.Status,
+                    Status        = "Ativo",
                     Condicao      = origem.Condicao,
                     ImagemPath    = string.Empty,
                     CriadoPorId   = usuarioId,
@@ -749,5 +790,132 @@ namespace PatriControl.Web.Controllers
 
             return Json(new { ok = true, quantidade });
         }
+
+        // =========================================================
+        // FOTOS: LISTAR (AJAX)
+        // =========================================================
+        [HttpGet]
+        public IActionResult ListarFotos(int patrimonioId)
+        {
+            var fotos = _context.PatrimonioFotos
+                  .AsNoTracking()
+                .Where(f => f.PatrimonioId == patrimonioId)
+                .OrderBy(f => f.CriadoEm)
+                    .Select(f => new
+   {
+      id = f.Id,
+         caminho = "/" + f.CaminhoArquivo.Replace("\\", "/"),
+       nomeOriginal = f.NomeOriginal
+     })
+    .ToList();
+
+  return Json(fotos);
+     }
+
+        // =========================================================
+        // FOTOS: UPLOAD (AJAX) — para patrimônio já existente
+      // =========================================================
+    [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UploadFotos(int patrimonioId, List<IFormFile> fotos)
+        {
+  var uid = GetUserId();
+
+            if (patrimonioId <= 0)
+return Json(new { ok = false, message = "Patrimônio inválido." });
+
+        var existe = _context.Patrimonios.AsNoTracking().Any(p => p.Id == patrimonioId);
+       if (!existe)
+        return Json(new { ok = false, message = "Patrimônio não encontrado." });
+
+            if (fotos == null || fotos.Count == 0)
+          return Json(new { ok = false, message = "Nenhuma foto enviada." });
+
+  var extensoesPermitidas = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+       {
+     ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"
+            };
+
+        var pastaUpload = Path.Combine(_env.WebRootPath, "uploads", "patrimonios");
+       Directory.CreateDirectory(pastaUpload);
+
+        var fotosAdicionadas = new List<object>();
+
+            foreach (var arquivo in fotos)
+   {
+    if (arquivo.Length == 0) continue;
+   if (arquivo.Length > 10 * 1024 * 1024) // 10 MB
+    continue;
+
+        var ext = Path.GetExtension(arquivo.FileName);
+                if (!extensoesPermitidas.Contains(ext))
+        continue;
+
+    var nomeArquivo = $"{Guid.NewGuid()}{ext}";
+       var caminhoCompleto = Path.Combine(pastaUpload, nomeArquivo);
+            var caminhoRelativo = Path.Combine("uploads", "patrimonios", nomeArquivo);
+
+            using (var stream = new FileStream(caminhoCompleto, FileMode.Create))
+           {
+    await arquivo.CopyToAsync(stream);
+   }
+
+         var foto = new PatrimonioFoto
+     {
+        PatrimonioId = patrimonioId,
+             CaminhoArquivo = caminhoRelativo,
+    NomeOriginal = arquivo.FileName,
+          CriadoEm = DateTime.Now
+           };
+
+      _context.PatrimonioFotos.Add(foto);
+         _context.SaveChanges();
+
+      fotosAdicionadas.Add(new
+    {
+         id = foto.Id,
+     caminho = "/" + caminhoRelativo.Replace("\\", "/"),
+         nomeOriginal = foto.NomeOriginal
+       });
+     }
+
+            if (fotosAdicionadas.Count > 0)
+            {
+                await TryAuditAsync(uid, "Upload de fotos", "Patrimonio", patrimonioId,
+             $"{fotosAdicionadas.Count} foto(s) adicionada(s).");
+          }
+
+ return Json(new { ok = true, fotos = fotosAdicionadas });
+        }
+
+        // =========================================================
+        // FOTOS: EXCLUIR (AJAX)
+        // =========================================================
+   [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ExcluirFoto(int fotoId)
+        {
+            var uid = GetUserId();
+
+        var foto = _context.PatrimonioFotos.FirstOrDefault(f => f.Id == fotoId);
+            if (foto == null)
+  return Json(new { ok = false, message = "Foto não encontrada." });
+
+            // Excluir arquivo físico
+          var caminhoCompleto = Path.Combine(_env.WebRootPath, foto.CaminhoArquivo);
+            if (System.IO.File.Exists(caminhoCompleto))
+     {
+                try { System.IO.File.Delete(caminhoCompleto); } catch { }
+            }
+
+         var patrimonioId = foto.PatrimonioId;
+     _context.PatrimonioFotos.Remove(foto);
+            _context.SaveChanges();
+
+     await TryAuditAsync(uid, "Excluiu foto", "Patrimonio", patrimonioId,
+                $"Foto={foto.NomeOriginal}");
+
+        return Json(new { ok = true });
+     }
     }
 }

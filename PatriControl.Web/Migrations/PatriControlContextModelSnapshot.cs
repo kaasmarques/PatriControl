@@ -365,6 +365,34 @@ namespace PatriControl.Web.Migrations
                     b.ToTable("Patrimonios");
                 });
 
+            modelBuilder.Entity("PatriControl.Web.Models.PatrimonioFoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("CaminhoArquivo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NomeOriginal")
+                        .IsRequired()
+                        .HasMaxLength(260)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PatrimonioId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatrimonioId");
+
+                    b.ToTable("PatrimonioFotos");
+                });
+
             modelBuilder.Entity("PatriControl.Web.Models.TipoManutencao", b =>
                 {
                     b.Property<int>("Id")
@@ -686,6 +714,17 @@ namespace PatriControl.Web.Migrations
                     b.Navigation("CriadoPor");
                 });
 
+            modelBuilder.Entity("PatriControl.Web.Models.PatrimonioFoto", b =>
+                {
+                    b.HasOne("PatriControl.Web.Models.Patrimonio", "Patrimonio")
+                        .WithMany("Fotos")
+                        .HasForeignKey("PatrimonioId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Patrimonio");
+                });
+
             modelBuilder.Entity("PatriControl.Web.Models.TipoManutencao", b =>
                 {
                     b.HasOne("PatriControl.Web.Models.TipoPatrimonio", "TipoPatrimonio")
@@ -716,6 +755,8 @@ namespace PatriControl.Web.Migrations
 
             modelBuilder.Entity("PatriControl.Web.Models.Patrimonio", b =>
                 {
+                    b.Navigation("Fotos");
+
                     b.Navigation("Tramites");
                 });
 

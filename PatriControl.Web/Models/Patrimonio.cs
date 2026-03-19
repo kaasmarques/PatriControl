@@ -40,5 +40,8 @@ namespace PatriControl.Web.Models
 
         // --- Histórico ---
         public ICollection<Tramite> Tramites { get; set; } = new List<Tramite>();
+
+        // --- Fotos ---
+        public ICollection<PatrimonioFoto> Fotos { get; set; } = new List<PatrimonioFoto>();
     }
 }

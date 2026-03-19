@@ -25,6 +25,7 @@ namespace PatriControl.Web.Data
         public DbSet<Manutentor> Manutentores { get; set; } = null!;
         public DbSet<TipoManutencao> TiposManutencao { get; set; } = null!;
         public DbSet<AuditLog> AuditLogs { get; set; } = default!;
+        public DbSet<PatrimonioFoto> PatrimonioFotos { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -92,6 +93,15 @@ namespace PatriControl.Web.Data
                 .WithMany()
                 .HasForeignKey(a => a.UsuarioId)
                 .OnDelete(DeleteBehavior.SetNull);
+
+            // =========================
+            // PatrimonioFoto (Patrimonio 1:N Fotos) - cascade delete
+            // =========================
+            modelBuilder.Entity<PatrimonioFoto>()
+                .HasOne(f => f.Patrimonio)
+                .WithMany(p => p.Fotos)
+                .HasForeignKey(f => f.PatrimonioId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

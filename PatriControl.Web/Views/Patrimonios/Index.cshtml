@@ -469,6 +469,14 @@
                     </div>
                 </div>
 
+                <!-- Fotos do patrimônio -->
+                <div class="mt-4">
+                    <div class="text-white fw-semibold mb-1">Fotos do Patrimônio</div>
+                    <div id="det-fotos-galeria" class="app-fotos-grid">
+                        <div class="app-muted">Carregando fotos...</div>
+                    </div>
+                </div>
+
                 <div class="mt-4">
                     <div class="d-flex align-items-center justify-content-between mb-1">
                         <div class="text-white fw-semibold">Trâmites do Patrimônio</div>
@@ -634,6 +642,14 @@
                             <label class="form-label app-label">Condição</label>
                             <select class="form-select" id="edit-condicao" name="Condicao" asp-items="ViewBag.CondicaoLista"></select>
                         </div>
+
+                        <!-- Fotos existentes + Upload -->
+                        <div class="col-12">
+                            <label class="form-label app-label">Fotos</label>
+                            <div id="edit-fotos-existentes" class="app-fotos-grid mb-2"></div>
+                            <input type="file" class="form-control" id="edit-fotos-input" multiple accept="image/*" />
+                            <div class="app-muted small mt-1">Formatos: JPG, PNG, GIF, BMP, WEBP • Máx: 10 MB por foto</div>
+                        </div>
                     </div>
                 </div>
 
@@ -657,7 +673,7 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
             </div>
 
-            <form asp-action="Create" method="post" id="form-create-patrimonio">
+            <form asp-action="Create" method="post" id="form-create-patrimonio" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
 
                 <div class="modal-body">
@@ -787,6 +803,14 @@
                             <label class="form-label app-label">Condição</label>
                             <select class="form-select" name="Condicao" asp-items="ViewBag.CondicaoLista"></select>
                         </div>
+
+                        <!-- Fotos -->
+                        <div class="col-12">
+                            <label class="form-label app-label">Fotos</label>
+                            <input type="file" class="form-control" id="create-fotos-input" name="fotos" multiple accept="image/*" onchange="previewFotosCreate()" />
+                            <div class="app-muted small mt-1">Formatos: JPG, PNG, GIF, BMP, WEBP • Máx: 10 MB por foto</div>
+                            <div id="create-fotos-preview" class="app-fotos-grid mt-2"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -867,6 +891,29 @@
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- =================================================
+   MODAL: VISUALIZAR FOTO (Lightbox)
+   ================================================= -->
+<div class="modal fade" id="modal-foto-lightbox" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content" style="background:rgba(0,0,0,.92);border:1px solid var(--app-border);">
+            <div class="modal-header border-0 pb-0">
+   <span class="text-white small" id="lightbox-counter"></span>
+     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+         </div>
+         <div class="modal-body text-center p-2 d-flex align-items-center justify-content-center" style="min-height:400px;">
+      <button type="button" class="btn btn-outline-secondary me-2 lightbox-nav" onclick="lightboxPrev()" style="flex-shrink:0;">
+            <i class="bi bi-chevron-left"></i>
+       </button>
+ <img id="lightbox-img" src="" alt="Foto" style="max-width:100%;max-height:70vh;border-radius:8px;object-fit:contain;" />
+<button type="button" class="btn btn-outline-secondary ms-2 lightbox-nav" onclick="lightboxNext()" style="flex-shrink:0;">
+      <i class="bi bi-chevron-right"></i>
+      </button>
+      </div>
         </div>
     </div>
 </div>
@@ -1483,6 +1530,31 @@
                 });
         }
 
+        function carregarFotosDetalhes(patrimonioId) {
+  const container = document.getElementById('det-fotos-galeria');
+         if (!container) return;
+
+   container.innerHTML = '<div class="app-muted">Carregando fotos...</div>';
+
+            fetch(`/Patrimonios/ListarFotos?patrimonioId=${patrimonioId}`)
+   .then(r => r.ok ? r.json() : [])
+             .then(fotos => {
+      if (!fotos || !fotos.length) {
+             container.innerHTML = '<div class="app-muted">Nenhuma foto cadastrada.</div>';
+       return;
+      }
+         detalhesFotos = fotos;
+    container.innerHTML = fotos.map((f, idx) => `
+          <div class="app-foto-thumb">
+ <img src="${f.caminho}" alt="${escapeHtml(f.nomeOriginal)}" onclick="abrirLightboxDetalhes(${idx})" />
+     </div>
+     `).join('');
+  })
+                .catch(() => {
+           container.innerHTML = '<div class="text-danger">Erro ao carregar fotos.</div>';
+     });
+        }
+
         function abrirDetalhesPatrimonio(botao) {
             const json = botao.getAttribute('data-patrimonio') || '{}';
             let p = {};
@@ -1515,314 +1587,446 @@
             document.getElementById('det-status').value     = p.status || '';
             document.getElementById('det-condicao').value   = p.condicao || '';
 
-            if (p.id) carregarTramites(p.id);
-            else {
+            if (p.id) {
+                carregarTramites(p.id);
+                carregarFotosDetalhes(p.id);
+            } else {
                 const container = document.getElementById('det-tramites');
                 if (container) container.innerHTML = '<div class="app-muted">Nenhum trâmite encontrado.</div>';
+                const fotosContainer = document.getElementById('det-fotos-galeria');
+                if (fotosContainer) fotosContainer.innerHTML = '<div class="app-muted">Nenhuma foto cadastrada.</div>';
             }
 
             showModal('modal-detalhes-patrimonio');
         }
 
         function abrirEditarPatrimonio(botao) {
-            const json = botao.getAttribute('data-patrimonio') || '{}';
-            let p = {};
-            try { p = JSON.parse(json); } catch { }
+   const json = botao.getAttribute('data-patrimonio') || '{}';
+   let p = {};
+       try { p = JSON.parse(json); } catch { }
 
-            document.getElementById('edit-id').value = p.id || 0;
-            document.getElementById('edit-numero').value = p.numero || '';
-            document.getElementById('edit-descricao').value = p.descricao || '';
-            document.getElementById('edit-numero-serie-nf').value = p.numeroSerieNF || '';
-            document.getElementById('edit-numero-nf').value = p.numeroNF || '';
+    document.getElementById('edit-id').value = p.id || 0;
+       document.getElementById('edit-numero').value = p.numero || '';
+       document.getElementById('edit-descricao').value = p.descricao || '';
+         document.getElementById('edit-numero-serie-nf').value = p.numeroSerieNF || '';
+   document.getElementById('edit-numero-nf').value = p.numeroNF || '';
 
-            if (p.valor != null && p.valor !== "") {
-                const numeroValor = Number(p.valor);
-                if (!isNaN(numeroValor)) {
-                    document.getElementById('edit-valor').value =
-                        numeroValor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                } else {
-                    document.getElementById('edit-valor').value = p.valor;
-                }
-            } else {
-                document.getElementById('edit-valor').value = '';
+      if (p.valor != null && p.valor !== "") {
+         const numeroValor = Number(p.valor);
+    if (!isNaN(numeroValor)) {
+       document.getElementById('edit-valor').value =
+       numeroValor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } else {
+        document.getElementById('edit-valor').value = p.valor;
+  }
+       } else {
+       document.getElementById('edit-valor').value = '';
             }
 
-            document.getElementById('edit-datacompra').value = p.dataCompra || '';
-            document.getElementById('edit-status').value = p.status || 'Ativo';
-            document.getElementById('edit-condicao').value = p.condicao || 'Novo';
+    document.getElementById('edit-datacompra').value = p.dataCompra || '';
+   document.getElementById('edit-status').value = p.status || 'Ativo';
+       document.getElementById('edit-condicao').value = p.condicao || 'Novo';
 
-            const unidadeDisplay = (p.unidade || '').trim();
-            const unidadeObj = getUnidadeByDisplay(unidadeDisplay);
-            const unidadeId = unidadeObj ? unidadeObj.id : 0;
+   const unidadeDisplay = (p.unidade || '').trim();
+     const unidadeObj = getUnidadeByDisplay(unidadeDisplay);
+      const unidadeId = unidadeObj ? unidadeObj.id : 0;
 
             document.getElementById('edit-unidade-busca').value = unidadeDisplay;
-            document.getElementById('edit-unidade-value').value = unidadeDisplay;
-            document.getElementById('edit-unidade-id').value = unidadeId ? String(unidadeId) : "";
+   document.getElementById('edit-unidade-value').value = unidadeDisplay;
+   document.getElementById('edit-unidade-id').value = unidadeId ? String(unidadeId) : "";
 
-            const loc = (p.localizacao || '').trim();
-            document.getElementById('edit-localizacao-busca').value = loc;
-            document.getElementById('edit-localizacao-value').value = loc;
+     const loc = (p.localizacao || '').trim();
+    document.getElementById('edit-localizacao-busca').value = loc;
+         document.getElementById('edit-localizacao-value').value = loc;
 
-            const tipo = (p.tipo || '').trim();
-            document.getElementById('edit-tipo-busca').value = tipo;
-            document.getElementById('edit-tipo-value').value = tipo;
+   const tipo = (p.tipo || '').trim();
+          document.getElementById('edit-tipo-busca').value = tipo;
+         document.getElementById('edit-tipo-value').value = tipo;
 
-            const forn = (p.fornecedor || '').trim();
-            document.getElementById('edit-fornecedor-busca').value = forn;
-            document.getElementById('edit-fornecedor-value').value = forn;
+     const forn = (p.fornecedor || '').trim();
+document.getElementById('edit-fornecedor-busca').value = forn;
+      document.getElementById('edit-fornecedor-value').value = forn;
 
-            showModal('modal-editar-patrimonio');
+   // Limpar input de fotos e carregar fotos existentes
+   const editFotosInput = document.getElementById('edit-fotos-input');
+if (editFotosInput) editFotosInput.value = '';
+         if (p.id) carregarFotosEdit(p.id);
+
+      showModal('modal-editar-patrimonio');
+ }
+
+    function abrirCriarPatrimonio() {
+         const form = document.querySelector('#modal-criar-patrimonio form');
+   if (form) form.reset();
+
+     document.getElementById('create-unidade-id').value = "";
+            document.getElementById('create-unidade-value').value = "";
+       document.getElementById('create-unidade-busca').value = "";
+
+   document.getElementById('create-localizacao-value').value = "";
+  document.getElementById('create-localizacao-busca').value = "";
+
+   document.getElementById('create-tipo-value').value = "";
+      document.getElementById('create-tipo-busca').value = "";
+
+    document.getElementById('create-fornecedor-value').value = "";
+       document.getElementById('create-fornecedor-busca').value = "";
+
+   // Limpar preview de fotos
+     createFotosDataTransfer = new DataTransfer();
+   const previewContainer = document.getElementById('create-fotos-preview');
+  if (previewContainer) previewContainer.innerHTML = '';
+     const createFotosInput = document.getElementById('create-fotos-input');
+     if (createFotosInput) createFotosInput.value = '';
+
+       showModal('modal-criar-patrimonio');
+  }
+
+   // =========================================================
+        // FOTOS: Create (preview local com remoção antes de salvar)
+        // =========================================================
+        let createFotosDataTransfer = new DataTransfer();
+
+      function previewFotosCreate() {
+   const input = document.getElementById('create-fotos-input');
+            const container = document.getElementById('create-fotos-preview');
+            for (let i = 0; i < input.files.length; i++) {
+     createFotosDataTransfer.items.add(input.files[i]);
+          }
+            input.files = createFotosDataTransfer.files;
+    renderCreateFotosPreview();
         }
 
-        function abrirCriarPatrimonio() {
-            const form = document.querySelector('#modal-criar-patrimonio form');
-            if (form) form.reset();
+        function renderCreateFotosPreview() {
+            const container = document.getElementById('create-fotos-preview');
+        const files = createFotosDataTransfer.files;
+            if (files.length === 0) { container.innerHTML = ''; return; }
+            let html = '';
+    for (let i = 0; i < files.length; i++) {
+       const url = URL.createObjectURL(files[i]);
+    html += `
+    <div class="app-foto-thumb" id="create-foto-${i}">
+              <img src="${url}" alt="${escapeHtml(files[i].name)}" onclick="abrirLightboxLocal(${i})" />
+           <button type="button" class="app-foto-remove" onclick="removerFotoCreate(${i})" title="Remover foto">
+        <i class="bi bi-x-circle-fill"></i>
+            </button>
+      </div>`;
+          }
+    container.innerHTML = html;
+     }
 
-            document.getElementById('create-unidade-id').value = "";
-            document.getElementById('create-unidade-value').value = "";
-            document.getElementById('create-unidade-busca').value = "";
+      function removerFotoCreate(index) {
+       const novoDataTransfer = new DataTransfer();
+         for (let i = 0; i < createFotosDataTransfer.files.length; i++) {
+            if (i !== index) novoDataTransfer.items.add(createFotosDataTransfer.files[i]);
+            }
+     createFotosDataTransfer = novoDataTransfer;
+   document.getElementById('create-fotos-input').files = createFotosDataTransfer.files;
+            renderCreateFotosPreview();
+        }
 
-            document.getElementById('create-localizacao-value').value = "";
-            document.getElementById('create-localizacao-busca').value = "";
-
-            document.getElementById('create-tipo-value').value = "";
-            document.getElementById('create-tipo-busca').value = "";
-
-            document.getElementById('create-fornecedor-value').value = "";
-            document.getElementById('create-fornecedor-busca').value = "";
-
-            showModal('modal-criar-patrimonio');
+        function abrirLightboxLocal(index) {
+      lightboxFotos = [];
+for (let i = 0; i < createFotosDataTransfer.files.length; i++) {
+       lightboxFotos.push({ caminho: URL.createObjectURL(createFotosDataTransfer.files[i]) });
+          }
+     lightboxIndex = index;
+            renderLightbox();
+      showModal('modal-foto-lightbox');
         }
 
         // =========================================================
+     // FOTOS: Edit (AJAX upload/delete + fotos existentes)
+        // =========================================================
+   let editPatrimonioId = 0;
+
+        function carregarFotosEdit(patrimonioId) {
+            editPatrimonioId = patrimonioId;
+        const container = document.getElementById('edit-fotos-existentes');
+            if (!container) return;
+      container.innerHTML = '<div class="app-muted">Carregando fotos...</div>';
+   fetch(`/Patrimonios/ListarFotos?patrimonioId=${patrimonioId}`)
+          .then(r => r.ok ? r.json() : [])
+                .then(fotos => {
+           if (!fotos || !fotos.length) {
+           container.innerHTML = '<div class="app-muted small">Nenhuma foto cadastrada.</div>';
+         return;
+        }
+        container.innerHTML = fotos.map(f => `
+             <div class="app-foto-thumb" id="edit-foto-${f.id}">
+ <img src="${f.caminho}" alt="${escapeHtml(f.nomeOriginal)}" onclick="abrirLightboxServidor(${f.id})" />
+        <button type="button" class="app-foto-remove" onclick="excluirFotoEdit(${f.id})" title="Remover foto">
+    <i class="bi bi-x-circle-fill"></i>
+       </button>
+        </div>`).join('');
+                })
+      .catch(() => {
+          container.innerHTML = '<div class="text-danger small">Erro ao carregar fotos.</div>';
+         });
+     }
+
+   function uploadFotosEdit() {
+            const input = document.getElementById('edit-fotos-input');
+            if (!input.files.length || !editPatrimonioId) return;
+       const formData = new FormData();
+            formData.append('patrimonioId', String(editPatrimonioId));
+          for (let i = 0; i < input.files.length; i++) {
+    formData.append('fotos', input.files[i]);
+   }
+       const token = getAntiForgeryToken('form-edit-patrimonio');
+ formData.append('__RequestVerificationToken', token);
+            fetch('/Patrimonios/UploadFotos', { method: 'POST', body: formData })
+       .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao enviar." })
+  .then(res => {
+ input.value = '';
+   if (!res.ok) { showToast(res.message || "Erro ao enviar fotos.", "danger"); return; }
+                    showToast("Foto(s) adicionada(s) com sucesso.", "success");
+          carregarFotosEdit(editPatrimonioId);
+       })
+      .catch(() => { input.value = ''; showToast("Erro ao enviar fotos.", "danger"); });
+        }
+
+      function excluirFotoEdit(fotoId) {
+ if (!confirm("Excluir esta foto?")) return;
+         const token = getAntiForgeryToken('form-edit-patrimonio');
+   const body = new URLSearchParams();
+            body.append('__RequestVerificationToken', token);
+  body.append('fotoId', String(fotoId));
+            fetch('/Patrimonios/ExcluirFoto', {
+            method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+ body: body.toString()
+            })
+      .then(r => r.ok ? r.json() : { ok: false, message: "Erro." })
+           .then(res => {
+            if (!res.ok) { showToast(res.message || "Erro ao excluir.", "danger"); return; }
+const el = document.getElementById(`edit-foto-${fotoId}`);
+  if (el) el.remove();
+      const container = document.getElementById('edit-fotos-existentes');
+       if (container && !container.querySelector('.app-foto-thumb')) {
+            container.innerHTML = '<div class="app-muted small">Nenhuma foto cadastrada.</div>';
+       }
+    showToast("Foto excluída com sucesso.", "success");
+  })
+.catch(() => showToast("Erro ao excluir foto.", "danger"));
+        }
+
+        // =========================================================
+        // LIGHTBOX (navegação de fotos)
+        // =========================================================
+        let lightboxFotos = [];
+        let lightboxIndex = 0;
+        let detalhesFotos = [];
+
+      function abrirLightboxServidor(fotoId) {
+            const container = document.getElementById('edit-fotos-existentes');
+    const imgs = container ? container.querySelectorAll('.app-foto-thumb img') : [];
+            lightboxFotos = [];
+        let startIdx = 0;
+            imgs.forEach((img, i) => {
+          lightboxFotos.push({ caminho: img.src });
+           const parentId = img.closest('.app-foto-thumb')?.id || '';
+   if (parentId === `edit-foto-${fotoId}`) startIdx = i;
+            });
+     lightboxIndex = startIdx;
+            renderLightbox();
+   showModal('modal-foto-lightbox');
+        }
+
+        function abrirLightboxDetalhes(index) {
+          lightboxFotos = detalhesFotos;
+      lightboxIndex = index;
+     renderLightbox();
+            showModal('modal-foto-lightbox');
+  }
+
+        function renderLightbox() {
+      const img = document.getElementById('lightbox-img');
+         const counter = document.getElementById('lightbox-counter');
+    if (!lightboxFotos.length) return;
+            if (lightboxIndex < 0) lightboxIndex = lightboxFotos.length - 1;
+   if (lightboxIndex >= lightboxFotos.length) lightboxIndex = 0;
+     img.src = lightboxFotos[lightboxIndex].caminho;
+    counter.textContent = `${lightboxIndex + 1} / ${lightboxFotos.length}`;
+  const navs = document.querySelectorAll('.lightbox-nav');
+            navs.forEach(n => n.style.display = lightboxFotos.length > 1 ? '' : 'none');
+        }
+
+        function lightboxPrev() { lightboxIndex--; renderLightbox(); }
+        function lightboxNext() { lightboxIndex++; renderLightbox(); }
+
+      // =========================================================
         // Trâmites personalizados
         // =========================================================
         let patrimonioAtualId = 0;
 
-        function abrirTramitePersonalizado() {
+ function abrirTramitePersonalizado() {
             if (!patrimonioAtualId) {
                 showToast("Patrimônio inválido.", "danger");
-                return;
-            }
-
+          return;
+     }
             document.getElementById('tp-patrimonio-id').value = patrimonioAtualId;
-            document.getElementById('tp-texto').value = "";
-            showModal('modal-tramite-personalizado');
-
+          document.getElementById('tp-texto').value = "";
+    showModal('modal-tramite-personalizado');
             setTimeout(() => document.getElementById('tp-texto')?.focus(), 150);
         }
 
-        // =========================================================
+  // =========================================================
         // Duplicar patrimônio
         // =========================================================
-        function abrirDuplicarPatrimonio() {
-            if (!patrimonioAtualId) {
-                showToast("Patrimônio inválido.", "danger");
-                return;
-            }
-
-            const descricao = document.getElementById('det-descricao')?.value || "";
-
-            document.getElementById('dup-patrimonio-id').value = patrimonioAtualId;
-            document.getElementById('dup-descricao').textContent = descricao;
-            document.getElementById('dup-quantidade').value = "1";
-
-            const erro = document.getElementById('dup-erro');
-            if (erro) { erro.style.display = 'none'; erro.textContent = ''; }
-
-            const btnSalvar = document.getElementById('dup-btn-salvar');
-            if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = "Duplicar"; }
-
-            showModal('modal-duplicar-patrimonio');
+  function abrirDuplicarPatrimonio() {
+       if (!patrimonioAtualId) {
+   showToast("Patrimônio inválido.", "danger");
+          return;
+  }
+  const descricao = document.getElementById('det-descricao')?.value || "";
+        document.getElementById('dup-patrimonio-id').value = patrimonioAtualId;
+     document.getElementById('dup-descricao').textContent = descricao;
+        document.getElementById('dup-quantidade').value = "1";
+     const erro = document.getElementById('dup-erro');
+     if (erro) { erro.style.display = 'none'; erro.textContent = ''; }
+   const btnSalvar = document.getElementById('dup-btn-salvar');
+       if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = "Duplicar"; }
+ showModal('modal-duplicar-patrimonio');
             setTimeout(() => document.getElementById('dup-quantidade')?.focus(), 150);
         }
 
-        // =========================================================
+   // =========================================================
         // Helpers: Token + Toast
         // =========================================================
-        function getAntiForgeryToken(formId) {
+   function getAntiForgeryToken(formId) {
             const form = document.getElementById(formId);
             const token = form?.querySelector('input[name="__RequestVerificationToken"]');
-            return token ? token.value : '';
+     return token ? token.value : '';
         }
 
         function showToast(message, type = "success", delay) {
-            const container = document.querySelector(".toast-container");
-            if (!container) {
-                alert(message);
-                return;
-            }
-
-            const d = delay ?? (type === "danger" ? 4000 : 3000);
-
-            const toast = document.createElement("div");
-            toast.className = `toast align-items-center text-bg-${type} border-0 fade`;
+      const container = document.querySelector(".toast-container");
+            if (!container) { alert(message); return; }
+       const d = delay ?? (type === "danger" ? 4000 : 3000);
+  const toast = document.createElement("div");
+  toast.className = `toast align-items-center text-bg-${type} border-0 fade`;
             toast.setAttribute("role", "alert");
-            toast.setAttribute("aria-live", "assertive");
+      toast.setAttribute("aria-live", "assertive");
             toast.setAttribute("aria-atomic", "true");
-            toast.setAttribute("data-bs-delay", d.toString());
-
+     toast.setAttribute("data-bs-delay", d.toString());
             toast.innerHTML = `
-                <div class="d-flex">
-                    <div class="toast-body">${escapeHtml(message)}</div>
-                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
-                </div>
-            `;
-
+     <div class="d-flex">
+       <div class="toast-body">${escapeHtml(message)}</div>
+<button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fechar"></button>
+          </div>`;
             container.appendChild(toast);
-
-            const instance = bootstrap.Toast.getOrCreateInstance(toast, { delay: d });
-            instance.show();
-
+  const instance = bootstrap.Toast.getOrCreateInstance(toast, { delay: d });
+      instance.show();
             toast.addEventListener("hidden.bs.toast", () => toast.remove());
-        }
+    }
 
         // =========================================================
-        // DOMContentLoaded — event listeners dos forms
+  // DOMContentLoaded
         // =========================================================
         document.addEventListener('DOMContentLoaded', function () {
-            // Export: change unidade
+// Export: change unidade
             const selUnidade = document.getElementById('exp-unidade');
-            if (selUnidade) {
-                selUnidade.addEventListener('change', function () {
-                    updateLocalizacoesExport();
-                });
-            }
+       if (selUnidade) {
+      selUnidade.addEventListener('change', function () { updateLocalizacoesExport(); });
+   }
 
-            // Validação Create
+       // Validação Create
             const formCreate = document.getElementById('form-create-patrimonio');
-            if (formCreate) {
-                formCreate.addEventListener('submit', function (e) {
-                    trySyncExactFromInput('create-tipo-busca', 'create-tipo-value', tipos, 'nome');
-                    trySyncExactFromInput('create-fornecedor-busca', 'create-fornecedor-value', fornecedores, 'nome');
-
-                    const tipoHidden = (document.getElementById('create-tipo-value')?.value || "").trim();
-                    const tipoInput = (document.getElementById('create-tipo-busca')?.value || "").trim();
-
-                    if (!tipoHidden && tipoInput) {
-                        e.preventDefault();
-                        alert("Selecione um Tipo válido na lista.");
-                    }
+     if (formCreate) {
+          formCreate.addEventListener('submit', function (e) {
+         trySyncExactFromInput('create-tipo-busca', 'create-tipo-value', tipos, 'nome');
+     trySyncExactFromInput('create-fornecedor-busca', 'create-fornecedor-value', fornecedores, 'nome');
+           const tipoHidden = (document.getElementById('create-tipo-value')?.value || "").trim();
+         const tipoInput = (document.getElementById('create-tipo-busca')?.value || "").trim();
+              if (!tipoHidden && tipoInput) { e.preventDefault(); alert("Selecione um Tipo válido na lista."); }
                 });
-            }
+   }
 
-            // Validação Edit
-            const formEdit = document.getElementById('form-edit-patrimonio');
-            if (formEdit) {
-                formEdit.addEventListener('submit', function (e) {
-                    trySyncExactFromInput('edit-tipo-busca', 'edit-tipo-value', tipos, 'nome');
-                    trySyncExactFromInput('edit-fornecedor-busca', 'edit-fornecedor-value', fornecedores, 'nome');
+     // Validação Edit
+   const formEdit = document.getElementById('form-edit-patrimonio');
+        if (formEdit) {
+        formEdit.addEventListener('submit', function (e) {
+            trySyncExactFromInput('edit-tipo-busca', 'edit-tipo-value', tipos, 'nome');
+          trySyncExactFromInput('edit-fornecedor-busca', 'edit-fornecedor-value', fornecedores, 'nome');
+     const tipoHidden = (document.getElementById('edit-tipo-value')?.value || "").trim();
+      const tipoInput = (document.getElementById('edit-tipo-busca')?.value || "").trim();
+              if (tipoInput && !tipoHidden) { e.preventDefault(); alert("Selecione um Tipo válido na lista."); }
+         });
+         }
 
-                    const tipoHidden = (document.getElementById('edit-tipo-value')?.value || "").trim();
-                    const tipoInput = (document.getElementById('edit-tipo-busca')?.value || "").trim();
-
-                    if (tipoInput && !tipoHidden) {
-                        e.preventDefault();
-                        alert("Selecione um Tipo válido na lista.");
-                    }
-                });
-            }
+            // Upload de fotos no Edit (AJAX)
+            const editFotosInput = document.getElementById('edit-fotos-input');
+     if (editFotosInput) {
+    editFotosInput.addEventListener('change', function () { uploadFotosEdit(); });
+    }
 
             // Trâmite personalizado (AJAX)
             const formTramite = document.getElementById('form-tramite-personalizado');
             if (formTramite) {
-                formTramite.addEventListener('submit', function (e) {
-                    e.preventDefault();
+        formTramite.addEventListener('submit', function (e) {
+     e.preventDefault();
+          const texto = (document.getElementById('tp-texto').value || "").trim();
+         if (!texto) { showToast("Informe o trâmite.", "danger"); return; }
+      const token = getAntiForgeryToken('form-tramite-personalizado');
+        const body = new URLSearchParams();
+        body.append("__RequestVerificationToken", token);
+        body.append("patrimonioId", String(patrimonioAtualId));
+        body.append("texto", texto);
+ fetch('/Patrimonios/AdicionarTramitePersonalizado', {
+  method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: body.toString()
+       })
+    .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao salvar." })
+          .then(res => {
+          if (!res.ok) { showToast(res.message || "Erro ao salvar.", "danger"); return; }
+          hideModal('modal-tramite-personalizado');
+      carregarTramites(patrimonioAtualId);
+      showToast("Trâmite registrado com sucesso.", "success");
+                 })
+            .catch(() => showToast("Erro ao salvar.", "danger"));
+     });
+     }
 
-                    const texto = (document.getElementById('tp-texto').value || "").trim();
-                    if (!texto) {
-                        showToast("Informe o trâmite.", "danger");
-                        return;
-                    }
-
-                    const token = getAntiForgeryToken('form-tramite-personalizado');
-                    const body = new URLSearchParams();
-                    body.append("__RequestVerificationToken", token);
-                    body.append("patrimonioId", String(patrimonioAtualId));
-                    body.append("texto", texto);
-
-                    fetch('/Patrimonios/AdicionarTramitePersonalizado', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: body.toString()
-                    })
-                        .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao salvar." })
-                        .then(res => {
-                            if (!res.ok) {
-                                showToast(res.message || "Erro ao salvar.", "danger");
-                                return;
-                            }
-
-                            hideModal('modal-tramite-personalizado');
-                            carregarTramites(patrimonioAtualId);
-                            showToast("Trâmite registrado com sucesso.", "success");
-                        })
-                        .catch(() => showToast("Erro ao salvar.", "danger"));
-                });
-            }
-
-            // Duplicar patrimônio (AJAX)
-            const formDup = document.getElementById('form-duplicar-patrimonio');
+ // Duplicar patrimônio (AJAX)
+        const formDup = document.getElementById('form-duplicar-patrimonio');
             if (formDup) {
-                formDup.addEventListener('submit', function (e) {
-                    e.preventDefault();
-
+   formDup.addEventListener('submit', function (e) {
+   e.preventDefault();
                     const quantidade = parseInt(document.getElementById('dup-quantidade').value || "0", 10);
-                    const erro = document.getElementById('dup-erro');
-                    const btnSalvar = document.getElementById('dup-btn-salvar');
-
-                    const showErr = (msg) => {
-                        if (!erro) return;
-                        erro.textContent = msg;
-                        erro.style.display = 'block';
-                    };
-
-                    if (!quantidade || quantidade < 1 || quantidade > 100) {
-                        showErr("Informe uma quantidade entre 1 e 100.");
-                        return;
-                    }
-
-                    if (erro) { erro.style.display = 'none'; erro.textContent = ''; }
-
-                    btnSalvar.disabled = true;
-                    btnSalvar.textContent = "Duplicando...";
-
-                    const token = getAntiForgeryToken('form-duplicar-patrimonio');
-                    const body = new URLSearchParams();
-                    body.append("__RequestVerificationToken", token);
-                    body.append("patrimonioId", String(patrimonioAtualId));
-                    body.append("quantidade", String(quantidade));
-
-                    fetch('/Patrimonios/Duplicar', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: body.toString()
-                    })
-                        .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao duplicar." })
-                        .then(res => {
-                            btnSalvar.disabled = false;
-                            btnSalvar.textContent = "Duplicar";
-
-                            if (!res.ok) {
-                                showErr(res.message || "Erro ao duplicar.");
-                                return;
-                            }
-
-                            hideModal('modal-duplicar-patrimonio');
-                            showToast(
-                                res.quantidade === 1
-                                    ? "1 cópia criada com sucesso."
-                                    : `${res.quantidade} cópias criadas com sucesso.`,
-                                "success"
-                            );
-                        })
-                        .catch(() => {
-                            btnSalvar.disabled = false;
-                            btnSalvar.textContent = "Duplicar";
-                            showErr("Erro ao duplicar. Tente novamente.");
-                        });
+  const erro = document.getElementById('dup-erro');
+        const btnSalvar = document.getElementById('dup-btn-salvar');
+    const showErr = (msg) => { if (!erro) return; erro.textContent = msg; erro.style.display = 'block'; };
+   if (!quantidade || quantidade < 1 || quantidade > 100) { showErr("Informe uma quantidade entre 1 e 100."); return; }
+              if (erro) { erro.style.display = 'none'; erro.textContent = ''; }
+   btnSalvar.disabled = true;
+        btnSalvar.textContent = "Duplicando...";
+           const token = getAntiForgeryToken('form-duplicar-patrimonio');
+        const body = new URLSearchParams();
+         body.append("__RequestVerificationToken", token);
+     body.append("patrimonioId", String(patrimonioAtualId));
+           body.append("quantidade", String(quantidade));
+       fetch('/Patrimonios/Duplicar', {
+       method: 'POST',
+             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+         body: body.toString()
+     })
+ .then(r => r.ok ? r.json() : { ok: false, message: "Erro ao duplicar." })
+        .then(res => {
+btnSalvar.disabled = false;
+      btnSalvar.textContent = "Duplicar";
+        if (!res.ok) { showErr(res.message || "Erro ao duplicar."); return; }
+    hideModal('modal-duplicar-patrimonio');
+      showToast(res.quantidade === 1 ? "1 cópia criada com sucesso." : `${res.quantidade} cópias criadas com sucesso.`, "success");
+   })
+     .catch(() => {
+          btnSalvar.disabled = false;
+      btnSalvar.textContent = "Duplicar";
+          showErr("Erro ao duplicar. Tente novamente.");
+            });
                 });
-            }
+      }
         });
     </script>
 }
