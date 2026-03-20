@@ -193,6 +193,61 @@
     </div>
 </div>
 
+<!-- KPIs (Valores dos Patrimônios) -->
+<div class="row g-3 mb-3">
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+      <div class="d-flex justify-content-between align-items-start">
+                <div>
+      <div class="app-kpi-title">Valor total de patrimônios</div>
+ <div class="fs-4 fw-bold mt-1">@money(Model.ValorTotalPatrimonios)</div>
+               <div class="app-muted small mt-1">Conforme filtros.</div>
+      </div>
+      <span class="badge app-badge-kpi app-badge-kpi-total rounded-pill">R$</span>
+    </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start">
+        <div>
+     <div class="app-kpi-title">Valor de patrimônios ativos</div>
+  <div class="fs-4 fw-bold mt-1">@money(Model.ValorPatrimoniosAtivos)</div>
+     <div class="app-muted small mt-1">Status: Ativo.</div>
+        </div>
+          <span class="badge app-badge-kpi app-badge-kpi-ok rounded-pill">OK</span>
+            </div>
+   </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+        <div class="app-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start">
+      <div>
+         <div class="app-kpi-title">Valor de patrimônios em manutenção</div>
+         <div class="fs-4 fw-bold mt-1">@money(Model.ValorPatrimoniosEmManutencao)</div>
+       <div class="app-muted small mt-1">Status: Em manutenção.</div>
+        </div>
+     <span class="badge app-badge-kpi app-badge-kpi-man rounded-pill">MAN</span>
+   </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-md-6 col-xl-3">
+     <div class="app-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-start">
+           <div>
+            <div class="app-kpi-title">Valor de patrimônios baixados / inativos</div>
+       <div class="fs-4 fw-bold mt-1">@money(Model.ValorPatrimoniosBaixados)</div>
+          <div class="app-muted small mt-1">Status: Baixado.</div>
+     </div>
+           <span class="badge app-badge-kpi app-badge-kpi-off rounded-pill">OFF</span>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- KPIs (Manutenções no período) -->
 <div class="row g-3 mb-3">
     <div class="col-12 col-md-6 col-xl-3">

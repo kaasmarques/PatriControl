@@ -96,6 +96,16 @@ namespace PatriControl.Web.Controllers
             var totalBaixados = GetCount("Baixado");
             var totalEmManut = GetCount("Em manutenção");
 
+            // ===== KPIs Valores dos Patrimônios (somar no C# — compatível com SQLite) =====
+            var valoresPorStatus = qPat
+                .Select(p => new { Status = (p.Status ?? "").Trim(), Valor = p.Valor ?? 0m })
+                .ToList();
+
+            var valorTotalPatrimonios = valoresPorStatus.Sum(x => x.Valor);
+            var valorPatrimoniosAtivos = valoresPorStatus.Where(x => string.Equals(x.Status, "Ativo", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Valor);
+            var valorPatrimoniosEmManut = valoresPorStatus.Where(x => string.Equals(x.Status, "Em manutenção", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Valor);
+            var valorPatrimoniosBaixados = valoresPorStatus.Where(x => string.Equals(x.Status, "Baixado", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Valor);
+
             // Ordenar para o chart
             var statusDistOrdenado = statusDist.OrderByDescending(x => x.Qtde).ToList();
 
@@ -241,6 +251,11 @@ namespace PatriControl.Web.Controllers
                 TotalAtivos = totalAtivos,
                 TotalBaixados = totalBaixados,
                 TotalEmManutencao = totalEmManut,
+
+                ValorTotalPatrimonios = valorTotalPatrimonios,
+                ValorPatrimoniosAtivos = valorPatrimoniosAtivos,
+                ValorPatrimoniosEmManutencao = valorPatrimoniosEmManut,
+                ValorPatrimoniosBaixados = valorPatrimoniosBaixados,
 
                 ManutencoesAbertasPeriodo = manutAbertasPeriodo,
                 ManutencoesFinalizadasPeriodo = manutFinalizadasPeriodo,

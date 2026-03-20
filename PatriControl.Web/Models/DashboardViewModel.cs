@@ -23,6 +23,12 @@ namespace PatriControl.Web.Models.ViewModels
         public int TotalBaixados { get; set; }
         public int TotalEmManutencao { get; set; }
 
+        // ===== KPIs (Valores dos Patrimônios) =====
+        public decimal ValorTotalPatrimonios { get; set; }
+        public decimal ValorPatrimoniosAtivos { get; set; }
+        public decimal ValorPatrimoniosEmManutencao { get; set; }
+        public decimal ValorPatrimoniosBaixados { get; set; }
+
         // ===== KPIs (Manutenções no período) =====
         public int ManutencoesAbertasPeriodo { get; set; }
         public int ManutencoesFinalizadasPeriodo { get; set; }
